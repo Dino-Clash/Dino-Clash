@@ -1,15 +1,15 @@
-# Sintaxis Phaser 4 & TypeScript
+# Phaser 4 & TypeScript Syntax
 
-## Propósito
-Establecer las directrices de desarrollo utilizando la sintaxis de Phaser 4 y TypeScript para garantizar la modularidad del código, la correcta gestión del ciclo de vida de las escenas y el cumplimiento del tipado estricto orientado a objetos.
+## Purpose
+Establish development guidelines using Phaser 4 and TypeScript syntax to guarantee code modularity, proper scene lifecycle management, and strict object-oriented typing.
 
-## Directivas Obligatorias
-- **Comprensión de la modularidad del framework**: Organizar el código de forma modular, separando la lógica del juego de la presentación.
-- **Ciclo de vida de las escenas**: Gestionar adecuadamente los métodos principales del ciclo de vida de Phaser (`preload`, `create`, `update`).
-- **Tipado estricto orientado a objetos**: Emplear clases de TypeScript con tipado fuerte, evitando el uso de tipos genéricos o laxos como `any`.
+## Mandatory Directives
+- **Framework modularity understanding**: Organize the code modularly, separating game logic from presentation.
+- **Scene lifecycle management**: Correctly manage the main Phaser scene lifecycle methods (`preload`, `create`, `update`).
+- **Strict object-oriented typing**: Employ strongly-typed TypeScript classes, avoiding the use of lax or generic types such as `any`.
 
-## Anti-patrones
-- Evitar el uso de `any` para omitir la comprobación de tipos de TypeScript en objetos del motor de Phaser.
-- Sobrecargar la función `update` con lógica que debería ser inicializada en `create` o gestionada mediante eventos.
-- No utilizar la herencia y polimorfismo propios de la programación orientada a objetos para extender las clases base de Phaser (como `Phaser.Scene` o `Phaser.GameObjects.Sprite`).
-- Declarar variables de estado de la escena como variables globales o fuera del alcance de la clase de la escena.
+## Anti-patterns
+- Using `any` to bypass TypeScript type-checking on Phaser engine objects.
+- Overloading the `update` method with logic that should be initialized in `create` or handled via events.
+- Failing to use standard object-oriented programming inheritance and polymorphism when extending Phaser base classes (such as `Phaser.Scene` or `Phaser.GameObjects.Sprite`).
+- Declaring scene state variables globally or outside the scope of the scene class.
