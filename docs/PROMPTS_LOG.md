@@ -1,0 +1,5 @@
+# Prompts Logbook
+
+| Date | Agent Assigned | Model Utilized | Tokens (Est.) | Exact Prompt |
+|------|----------------|----------------|---------------|--------------|
+| 2026-05-21 | Technical Game Designer | Gemini 3.1 Pro (High) | ~4000 | `@[agents/technical-game-designer.md] Siguiendo el workflow/workflow.md (Step 1.2), tu misión es coger el docs/GDD.md (v1.0) actual y aplicar el balanceo numérico y las fórmulas para generar la versión v1.1. Instrucciones: Abre y edita el archivo docs/GDD.md. Añade una nueva sub-sección introduciendo los valores matemáticos exactos (en INGLÉS) para el balanceo del juego. Debes definir: Base Movement Speed (velocidad en píxeles por segundo). Jump Velocity & Gravity (fuerza del salto y gravedad del mundo). Knockback Force (cuántos píxeles se empuja al personaje al recibir daño). NPC Gun Rotation Speed (velocidad de rotación orbital del arma para que dé tiempo al jugador a esquivar). Raycast Bullet Speed (velocidad del proyectil). Al terminar, usa tu skill de auto-documentación en docs/PROMPTS_LOG.md y realiza un commit semántico con el mensaje: docs: update GDD to v1.1 with balanced numerical variables and math formulas` |

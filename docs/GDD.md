@@ -1,4 +1,4 @@
-# Game Design Document (v1.0)
+# Game Design Document (v1.1)
 **Project Name:** NebriGame / Dino-Clash
 **Genre:** 2v2 Platform Fighter
 
@@ -35,6 +35,15 @@ NebriGame is a fast-paced, 2v2 team-based platform fighting game featuring dinos
 - **Hit Reactions (Hurt State):** Receiving damage triggers the "Hurt" animation.
   - **Invulnerability:** The character gains exactly 1 second of invulnerability frames (i-frames).
   - **Knockback:** The character is physically pushed along the X-axis in the direction opposite to the impact point (e.g., a hit on the left side of the hitbox pushes the character to the right).
+
+### 2.3 Balancing & Mathematical Variables
+- **Base Movement Speed:** `300` pixels per second (px/s).
+- **Jump Velocity & Gravity:** 
+  - Jump Velocity: `-600` px/s (upward force).
+  - World Gravity: `1200` px/s² (downward acceleration).
+- **Knockback Force:** `400` px/s (instant horizontal velocity applied upon receiving damage).
+- **NPC Gun Rotation Speed:** `1.5` radians per second (approx. 85 degrees/s), allowing the player a fair evasion window before the NPC locks on.
+- **Raycast Bullet Speed:** `800` px/s (projectile travel velocity).
 
 ---
 
