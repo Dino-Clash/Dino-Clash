@@ -192,7 +192,7 @@ export class GameScene extends Phaser.Scene {
       this.enemies[this.enemyGunIndex].x,
       this.enemies[this.enemyGunIndex].y,
       'weapon_gun',
-    ).setDisplaySize(20, 15).setDepth(5);
+    ).setDisplaySize(30, 22).setDepth(5);
 
     this.ally = this.physics.add.sprite(440, 100, 'dino_vita');
     this.ally.setScale(2);
@@ -216,10 +216,10 @@ export class GameScene extends Phaser.Scene {
     this.allyHasGun = !playerGetsGun;
 
     if (this.playerHasGun) {
-      this.playerGun = this.add.image(this.player!.x, this.player!.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
+      this.playerGun = this.add.image(this.player!.x, this.player!.y, 'weapon_gun').setDisplaySize(30, 22).setDepth(5);
     }
     if (this.allyHasGun) {
-      this.allyGun = this.add.image(this.ally!.x, this.ally!.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
+      this.allyGun = this.add.image(this.ally!.x, this.ally!.y, 'weapon_gun').setDisplaySize(30, 22).setDepth(5);
     }
 
     this.bullets = this.add.group();
@@ -363,8 +363,8 @@ export class GameScene extends Phaser.Scene {
       const pointer = this.input.activePointer;
       const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
       this.playerGun.setPosition(
-        this.player.x + Math.cos(angle) * radius,
-        this.player.y + Math.sin(angle) * radius,
+        this.player.x + Math.cos(angle) * 28,
+        this.player.y + Math.sin(angle) * 28,
       );
       this.playerGun.setRotation(angle);
       this.playerGun.setFlipY(Math.abs(angle) > Math.PI / 2);
