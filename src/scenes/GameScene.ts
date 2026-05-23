@@ -14,13 +14,13 @@ export class GameScene extends Phaser.Scene {
   private enemyGuns: Phaser.GameObjects.Image[] = [];
   private enemyGroup: Phaser.GameObjects.Group | null = null;
   private lastEnemyShootTimes: number[] = [0, 0];
+  private lastAllyShootTime: number = 0;
 
   private ally: Phaser.Physics.Arcade.Sprite | null = null;
   private allyGun: Phaser.GameObjects.Image | null = null;
   private loyalty: number = 100;
   private allyFSMText: Phaser.GameObjects.Text | null = null;
 
-  private playerGun: Phaser.GameObjects.Image | null = null;
   private bullets: Phaser.Physics.Arcade.Group | null = null;
 
   private isPlayerAttacking: boolean = false;
@@ -93,6 +93,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setData('hp', 3);
     this.player.setData('invulnUntil', 0);
+    this.player.setData('dinoKey', 'doux');
 
     if (this.player.body) {
       this.player.refreshBody();
@@ -104,7 +105,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player, this.platforms);
     }
 
-    const dinoKeys = ['doux', 'mort', 'vita'];
+    const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
     for (const key of dinoKeys) {
       this.anims.create({
         key: `${key}_idle`,
@@ -147,11 +148,14 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < enemySpawns.length; i++) {
       const spawn = enemySpawns[i];
-      const enemy = this.physics.add.sprite(spawn.x, spawn.y, 'dino_mort');
+      const isRanged = i === 0;
+      const dinoName = isRanged ? 'mort' : 'tard';
+      const enemy = this.physics.add.sprite(spawn.x, spawn.y, `dino_${dinoName}`);
       enemy.setScale(2);
       enemy.setCollideWorldBounds(true);
       enemy.setData('hp', 3);
       enemy.setData('invulnUntil', 0);
+      enemy.setData('dinoKey', dinoName);
 
       if (enemy.body) {
         enemy.refreshBody();
@@ -167,8 +171,10 @@ export class GameScene extends Phaser.Scene {
       this.enemies.push(enemy);
       this.enemyGroup.add(enemy);
 
-      const gun = this.add.image(spawn.x, spawn.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
-      this.enemyGuns.push(gun);
+      if (isRanged) {
+        const gun = this.add.image(spawn.x, spawn.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
+        this.enemyGuns.push(gun);
+      }
     }
 
     this.ally = this.physics.add.sprite(440, 100, 'dino_vita');
@@ -176,6 +182,7 @@ export class GameScene extends Phaser.Scene {
     this.ally.setCollideWorldBounds(true);
     this.ally.setData('hp', 3);
     this.ally.setData('invulnUntil', 0);
+    this.ally.setData('dinoKey', 'vita');
 
     if (this.ally.body) {
       this.ally.refreshBody();
@@ -188,8 +195,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.allyGun = this.add.image(440, 100, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
-
-    this.playerGun = this.add.image(400, 100, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
 
     this.bullets = this.physics.add.group({ allowGravity: false });
 
@@ -271,36 +276,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateGuns(): void {
-    if (!this.playerGun || !this.player) return;
-    const pointer = this.input.activePointer;
-    const playerAngle = Phaser.Math.Angle.Between(
-      this.player.x, this.player.y,
-      pointer.worldX, pointer.worldY,
-    );
     const radius = 22;
-    this.playerGun.setPosition(
-      this.player.x + Math.cos(playerAngle) * radius,
-      this.player.y + Math.sin(playerAngle) * radius,
-    );
-    this.playerGun.setRotation(playerAngle);
-    this.playerGun.setFlipY(Math.abs(playerAngle) > Math.PI / 2);
 
-    for (let i = 0; i < this.enemies.length; i++) {
-      const enemy = this.enemies[i];
-      if (!enemy.active) {
-        this.enemyGuns[i].setVisible(false);
-        continue;
-      }
-      const target = this.player;
-      if (!target?.active) continue;
-      const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, target.x, target.y);
-      this.enemyGuns[i].setPosition(
+    if (this.enemyGuns.length > 0 && this.enemies[0]?.active && this.player?.active) {
+      const enemy = this.enemies[0];
+      const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+      this.enemyGuns[0].setPosition(
         enemy.x + Math.cos(angle) * radius,
         enemy.y + Math.sin(angle) * radius,
       );
-      this.enemyGuns[i].setRotation(angle);
-      this.enemyGuns[i].setFlipY(Math.abs(angle) > Math.PI / 2);
-      this.enemyGuns[i].setVisible(true);
+      this.enemyGuns[0].setRotation(angle);
+      this.enemyGuns[0].setFlipY(Math.abs(angle) > Math.PI / 2);
+      this.enemyGuns[0].setVisible(true);
     }
 
     if (this.allyGun && this.ally?.active) {
@@ -326,34 +313,68 @@ export class GameScene extends Phaser.Scene {
 
       const onGround = enemy.body?.blocked.down ?? false;
       const dir = this.enemyDirections[i];
+      const dinoKey = enemy.getData('dinoKey') as string;
+      const isRanged = i === 0;
 
       if (onGround && !this.hasGroundAhead(enemy, dir)) {
         this.enemyDirections[i] *= -1;
+        enemy.setVelocityX(this.enemyDirections[i] * 150);
+      } else if (!isRanged) {
         enemy.setVelocityX(this.enemyDirections[i] * 150);
       }
 
       enemy.setFlipX(this.enemyDirections[i] < 0);
 
       if (!onGround) {
-        enemy.play('mort_jump', true);
-      } else if (enemy.body?.velocity.x !== 0) {
-        enemy.play('mort_run', true);
+        enemy.play(`${dinoKey}_jump`, true);
+      } else if (Math.abs(enemy.body?.velocity.x ?? 0) > 0) {
+        enemy.play(`${dinoKey}_run`, true);
       } else {
-        enemy.play('mort_idle', true);
+        enemy.play(`${dinoKey}_idle`, true);
       }
 
       const target = this.player;
       if (!target?.active) continue;
 
-      const gun = this.enemyGuns[i];
-      const angle = Phaser.Math.Angle.Between(gun.x, gun.y, target.x, target.y);
+      if (isRanged) {
+        if (this.enemyGuns.length === 0) continue;
+        const gun = this.enemyGuns[0];
+        const angle = Phaser.Math.Angle.Between(gun.x, gun.y, target.x, target.y);
 
-      if (
-        this.time.now > this.lastEnemyShootTimes[i] + 2000 &&
-        this.hasLineOfSight(gun.x, gun.y, target.x, target.y)
-      ) {
-        this.fireBullet(gun.x, gun.y, angle, 'enemy');
-        this.lastEnemyShootTimes[i] = this.time.now;
+        if (this.hasLineOfSight(gun.x, gun.y, target.x, target.y)) {
+          enemy.setVelocityX(0);
+          if (this.time.now > this.lastEnemyShootTimes[0] + 2000) {
+            this.fireBullet(gun.x, gun.y, angle, 'enemy');
+            this.lastEnemyShootTimes[0] = this.time.now;
+          }
+        } else {
+          enemy.setVelocityX(Math.cos(angle) * 150);
+          this.enemyDirections[0] = Math.cos(angle) > 0 ? 1 : -1;
+        }
+      } else {
+        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, target.x, target.y);
+        enemy.setVelocityX(Math.cos(angle) * 150);
+        this.enemyDirections[1] = Math.cos(angle) > 0 ? 1 : -1;
+
+        const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, target.x, target.y);
+        if (dist < 40 && this.time.now > this.lastEnemyShootTimes[1] + 1000) {
+          this.lastEnemyShootTimes[1] = this.time.now;
+          enemy.play(`${dinoKey}_attack`);
+          const eb = enemy.body as Phaser.Physics.Arcade.Body;
+          if (eb && this.player?.active) {
+            const facingRight = !enemy.flipX;
+            const ax = facingRight ? eb.x + eb.width : eb.x - 20;
+            const ay = eb.y - 4;
+            const attackRect = new Phaser.Geom.Rectangle(ax, ay, 20, eb.height + 8);
+            const pb = this.player.body as Phaser.Physics.Arcade.Body;
+            if (pb) {
+              const playerRect = new Phaser.Geom.Rectangle(pb.x, pb.y, pb.width, pb.height);
+              if (Phaser.Geom.Rectangle.Overlaps(attackRect, playerRect)) {
+                this.applyDamageTo(this.player, facingRight ? 1 : -1);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -439,7 +460,7 @@ export class GameScene extends Phaser.Scene {
     target.setData('invulnUntil', this.time.now + 1000);
     target.setVelocityX(dir * 400);
 
-    const key = target === this.player ? 'doux' : target === this.ally ? 'vita' : 'mort';
+    const key = target.getData('dinoKey') as string;
     target.play(`${key}_hurt`);
 
     if (hp - 1 <= 0) {
@@ -479,15 +500,37 @@ export class GameScene extends Phaser.Scene {
 
     if (state === 'Loyal') {
       const target = this.enemies.find(e => e.active);
-      if (target) {
-        const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
-        this.ally.setVelocityX(Math.cos(angle) * 150);
+      if (target && this.allyGun) {
+        const gx = this.allyGun.x;
+        const gy = this.allyGun.y;
+        const angle = this.allyGun.rotation;
+        if (this.hasLineOfSight(gx, gy, target.x, target.y)) {
+          this.ally.setVelocityX(0);
+          if (this.time.now > this.lastAllyShootTime + 2000) {
+            this.fireBullet(gx, gy, angle, 'ally');
+            this.lastAllyShootTime = this.time.now;
+          }
+        } else {
+          const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
+          this.ally.setVelocityX(Math.cos(moveAngle) * 150);
+        }
       }
     }
 
-    if (state === 'Hostile' && this.player?.active) {
-      const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
-      this.ally.setVelocityX(Math.cos(angle) * 150);
+    if (state === 'Hostile' && this.player?.active && this.allyGun) {
+      const gx = this.allyGun.x;
+      const gy = this.allyGun.y;
+      const angle = this.allyGun.rotation;
+      if (this.hasLineOfSight(gx, gy, this.player.x, this.player.y)) {
+        this.ally.setVelocityX(0);
+        if (this.time.now > this.lastAllyShootTime + 2000) {
+          this.fireBullet(gx, gy, angle, 'ally');
+          this.lastAllyShootTime = this.time.now;
+        }
+      } else {
+        const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
+        this.ally.setVelocityX(Math.cos(moveAngle) * 150);
+      }
     }
 
     const allyVx = this.ally.body?.velocity.x ?? 0;
