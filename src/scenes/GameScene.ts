@@ -135,6 +135,12 @@ export class GameScene extends Phaser.Scene {
         repeat: 0,
       });
       this.anims.create({
+        key: `${key}_kick`,
+        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 10, end: 12 }),
+        frameRate: 10,
+        repeat: 0,
+      });
+      this.anims.create({
         key: `${key}_hurt`,
         frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 13, end: 16 }),
         frameRate: 8,
@@ -218,7 +224,7 @@ export class GameScene extends Phaser.Scene {
 
     this.bullets = this.add.group();
 
-    this.physics.add.overlap(this.bullets!, this.platforms, (bullet) => {
+    this.physics.add.collider(this.bullets!, this.platforms, (bullet) => {
       (bullet as Phaser.GameObjects.Rectangle).destroy();
     });
 
@@ -258,7 +264,7 @@ export class GameScene extends Phaser.Scene {
         if (this.time.now > this.lastPlayerAttackTime + 1000) {
           this.isPlayerAttacking = true;
           this.lastPlayerAttackTime = this.time.now;
-          this.player!.play('doux_attack');
+          this.player!.play('doux_kick');
         }
       }
     });
@@ -301,7 +307,7 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
       this.isPlayerAttacking = true;
       this.lastPlayerAttackTime = this.time.now;
-      this.player.play('doux_attack');
+      this.player.play('doux_kick');
     }
 
     if (this.isPlayerAttacking) {
@@ -376,7 +382,9 @@ export class GameScene extends Phaser.Scene {
         enemy.setVelocityX(this.enemyDirections[i] * 300);
       }
 
-      enemy.setFlipX(this.enemyDirections[i] < 0);
+      const eVx = enemy.body?.velocity.x ?? 0;
+      if (eVx < 0) enemy.setFlipX(true);
+      else if (eVx > 0) enemy.setFlipX(false);
 
       if (!onGround) {
         enemy.play(`${dinoKey}_jump`, true);
@@ -387,7 +395,11 @@ export class GameScene extends Phaser.Scene {
       }
 
       const target = this.player?.active ? this.player : (this.ally?.active ? this.ally : null);
-      if (!target) continue;
+      if (!target) {
+        enemy.setVelocityX(0);
+        enemy.play(`${dinoKey}_idle`, true);
+        continue;
+      }
 
       if (hasGun) {
         if (!this.enemyGun) continue;
@@ -412,7 +424,7 @@ export class GameScene extends Phaser.Scene {
         const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, target.x, target.y);
         if (dist < 40 && this.time.now > this.lastEnemyShootTimes[1] + 1000) {
           this.lastEnemyShootTimes[1] = this.time.now;
-          enemy.play(`${dinoKey}_attack`);
+          enemy.play(`${dinoKey}_kick`);
           this.applyDamageTo(target, !enemy.flipX ? 1 : -1);
         }
       }
@@ -557,8 +569,9 @@ export class GameScene extends Phaser.Scene {
 
     if (state === 'Loyal') {
       const target = this.enemies.find(e => e.active);
-      if (!target) return;
-      if (this.allyHasGun && this.allyGun) {
+      if (!target) {
+        this.ally.setVelocityX(0);
+      } else if (this.allyHasGun && this.allyGun) {
         const gx = this.allyGun.x;
         const gy = this.allyGun.y;
         const angle = this.allyGun.rotation;
@@ -576,7 +589,7 @@ export class GameScene extends Phaser.Scene {
         const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, target.x, target.y);
         if (dist < 40 && this.time.now > this.lastAllyShootTime + 1000) {
           this.lastAllyShootTime = this.time.now;
-          this.ally.play('vita_attack');
+          this.ally.play('vita_kick');
           this.applyDamageTo(target, !this.ally.flipX ? 1 : -1);
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
@@ -586,8 +599,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    if (state === 'Hostile' && this.player?.active) {
-      if (this.allyHasGun && this.allyGun) {
+    if (state === 'Hostile') {
+      if (!this.player?.active) {
+        this.ally.setVelocityX(0);
+      } else if (this.allyHasGun && this.allyGun) {
         const gx = this.allyGun.x;
         const gy = this.allyGun.y;
         const angle = this.allyGun.rotation;
@@ -605,7 +620,7 @@ export class GameScene extends Phaser.Scene {
         const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
         if (dist < 40 && this.time.now > this.lastAllyShootTime + 1000) {
           this.lastAllyShootTime = this.time.now;
-          this.ally.play('vita_attack');
+          this.ally.play('vita_kick');
           this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1);
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
