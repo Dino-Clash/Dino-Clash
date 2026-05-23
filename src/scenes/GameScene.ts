@@ -79,7 +79,15 @@ export class GameScene extends Phaser.Scene {
     this.keySpace = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) ?? null;
     this.keyF = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F) ?? null;
 
+    this.physics.world.setBounds(0, -500, 800, 2000);
+
     this.platforms = this.physics.add.staticGroup();
+
+    const leftWall = this.add.rectangle(-10, 300, 20, 600).setVisible(false);
+    this.platforms.add(leftWall);
+
+    const rightWall = this.add.rectangle(810, 300, 20, 600).setVisible(false);
+    this.platforms.add(rightWall);
 
     const platBottomLeft = this.add.rectangle(150, 480, 200, 16, 0x4a7023);
     platBottomLeft.setStrokeStyle(1, 0x2d4a15);
@@ -115,7 +123,6 @@ export class GameScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(400, 100, 'dino_doux');
     this.player.setScale(2);
-    this.player.setCollideWorldBounds(true);
     this.player.setData('hp', 3);
     this.player.setData('invulnUntil', 0);
     this.player.setData('dinoKey', 'doux');
@@ -182,7 +189,6 @@ export class GameScene extends Phaser.Scene {
       const dinoName = i === 0 ? 'mort' : 'tard';
       const enemy = this.physics.add.sprite(spawn.x, spawn.y, `dino_${dinoName}`);
       enemy.setScale(2);
-      enemy.setCollideWorldBounds(true);
       enemy.setData('hp', 3);
       enemy.setData('invulnUntil', 0);
       enemy.setData('dinoKey', dinoName);
@@ -212,7 +218,6 @@ export class GameScene extends Phaser.Scene {
 
     this.ally = this.physics.add.sprite(440, 100, 'dino_vita');
     this.ally.setScale(2);
-    this.ally.setCollideWorldBounds(true);
     this.ally.setData('hp', 3);
     this.ally.setData('invulnUntil', 0);
     this.ally.setData('dinoKey', 'vita');
@@ -304,7 +309,7 @@ export class GameScene extends Phaser.Scene {
 
       const pBusy = this.player.anims.isPlaying &&
         (this.player.anims.currentAnim?.key === 'doux_kick' ||
-         this.player.anims.currentAnim?.key === 'doux_hurt');
+          this.player.anims.currentAnim?.key === 'doux_hurt');
 
       if (this.keyA?.isDown) {
         this.player.setVelocityX(-300);
@@ -479,7 +484,7 @@ export class GameScene extends Phaser.Scene {
 
       const eBusy = enemy.anims.isPlaying &&
         (enemy.anims.currentAnim?.key === `${dinoKey}_kick` ||
-         enemy.anims.currentAnim?.key === `${dinoKey}_hurt`);
+          enemy.anims.currentAnim?.key === `${dinoKey}_hurt`);
       if (!eBusy) {
         if (!onGround) {
           enemy.play(`${dinoKey}_jump`, true);
@@ -567,7 +572,8 @@ export class GameScene extends Phaser.Scene {
 
     const hp = target.getData('hp') as number;
     target.setData('hp', hp - 1);
-    target.setVelocityX(dir * 400);
+    target.setVelocityX(dir * 1000);
+    target.setVelocityY(-600);
 
     const key = target.getData('dinoKey') as string;
     target.play(`${key}_hurt`);
@@ -767,7 +773,7 @@ export class GameScene extends Phaser.Scene {
 
     const aBusy = this.ally.anims.isPlaying &&
       (this.ally.anims.currentAnim?.key === 'vita_kick' ||
-       this.ally.anims.currentAnim?.key === 'vita_hurt');
+        this.ally.anims.currentAnim?.key === 'vita_hurt');
     if (!aBusy) {
       const allyVx = this.ally.body?.velocity.x ?? 0;
       if (Math.abs(allyVx) > 0) {
@@ -813,7 +819,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkFallDeath(): void {
-    const killY = 650;
+    const killY = 600;
     const killSprite = (sprite: Phaser.Physics.Arcade.Sprite) => {
       if (!sprite.active) return;
       sprite.setActive(false).setVisible(false);
@@ -826,9 +832,14 @@ export class GameScene extends Phaser.Scene {
         this.playerGun.destroy();
         this.playerGun = null;
       }
-      if (sprite === this.ally && this.allyGun) {
-        this.allyGun.destroy();
-        this.allyGun = null;
+      if (sprite === this.ally) {
+        if (this.allyGun) {
+          this.allyGun.destroy();
+          this.allyGun = null;
+        }
+        if (this.allyFSMText) {
+          this.allyFSMText.setVisible(false);
+        }
       }
       const enemyIdx = this.enemies.indexOf(sprite);
       if (enemyIdx >= 0 && enemyIdx === this.enemyGunIndex && this.enemyGun) {
