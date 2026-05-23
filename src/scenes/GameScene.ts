@@ -71,7 +71,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(400, 300, 'bg_1');
+    this.add.image(400, 300, 'bg_1').setDisplaySize(800, 600).setScrollFactor(0);
 
     this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
     this.keyA = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A) ?? null;
@@ -529,7 +529,7 @@ export class GameScene extends Phaser.Scene {
   private fireBullet(x: number, y: number, angle: number, owner: string): void {
     const bx = x + Math.cos(angle) * 15;
     const by = y + Math.sin(angle) * 15;
-    const bullet = this.add.rectangle(bx, by, 8, 4, 0xffff00).setDepth(10);
+    const bullet = this.add.rectangle(bx, by, 6, 6, 0xffff00).setDepth(10);
     this.physics.add.existing(bullet, false);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
