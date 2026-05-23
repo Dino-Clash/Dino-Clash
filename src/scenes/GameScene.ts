@@ -279,46 +279,46 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, _delta: number): void {
-    if (!this.player || !this.player.active) return;
+    if (this.player && this.player.active) {
+      const onGround = this.player.body?.blocked.down ?? false;
 
-    const onGround = this.player.body?.blocked.down ?? false;
+      if (onGround && (this.keySpace?.isDown || this.cursors?.up.isDown)) {
+        this.player.setVelocityY(-600);
+      }
 
-    if (onGround && (this.keySpace?.isDown || this.cursors?.up.isDown)) {
-      this.player.setVelocityY(-600);
-    }
+      const pBusy = this.player.anims.isPlaying &&
+        (this.player.anims.currentAnim?.key === 'doux_kick' ||
+         this.player.anims.currentAnim?.key === 'doux_hurt');
 
-    const pBusy = this.player.anims.isPlaying &&
-      (this.player.anims.currentAnim?.key === 'doux_kick' ||
-       this.player.anims.currentAnim?.key === 'doux_hurt');
+      if (this.keyA?.isDown) {
+        this.player.setVelocityX(-300);
+        if (onGround && !pBusy) this.player.play('doux_run', true);
+      } else if (this.keyD?.isDown) {
+        this.player.setVelocityX(300);
+        if (onGround && !pBusy) this.player.play('doux_run', true);
+      } else {
+        this.player.setVelocityX(0);
+        if (onGround && !pBusy) this.player.play('doux_idle', true);
+      }
 
-    if (this.keyA?.isDown) {
-      this.player.setVelocityX(-300);
-      if (onGround && !pBusy) this.player.play('doux_run', true);
-    } else if (this.keyD?.isDown) {
-      this.player.setVelocityX(300);
-      if (onGround && !pBusy) this.player.play('doux_run', true);
-    } else {
-      this.player.setVelocityX(0);
-      if (onGround && !pBusy) this.player.play('doux_idle', true);
-    }
+      const pVx = this.player.body?.velocity.x ?? 0;
+      if (pVx < 0) this.player.setFlipX(true);
+      else if (pVx > 0) this.player.setFlipX(false);
 
-    const pVx = this.player.body?.velocity.x ?? 0;
-    if (pVx < 0) this.player.setFlipX(true);
-    else if (pVx > 0) this.player.setFlipX(false);
+      if (!onGround && !pBusy) {
+        this.player.play('doux_jump', true);
+      }
 
-    if (!onGround && !pBusy) {
-      this.player.play('doux_jump', true);
-    }
+      if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
+        this.isPlayerAttacking = true;
+        this.lastPlayerAttackTime = this.time.now;
+        this.player.play('doux_kick');
+      }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
-      this.isPlayerAttacking = true;
-      this.lastPlayerAttackTime = this.time.now;
-      this.player.play('doux_kick');
-    }
-
-    if (this.isPlayerAttacking) {
-      this.checkMeleeHit();
-      this.isPlayerAttacking = false;
+      if (this.isPlayerAttacking) {
+        this.checkMeleeHit();
+        this.isPlayerAttacking = false;
+      }
     }
 
     this.updateGuns();
@@ -388,7 +388,17 @@ export class GameScene extends Phaser.Scene {
         enemy.setVelocityX(this.enemyDirections[i] * 300);
       }
 
-      const target = this.player?.active ? this.player : (this.ally?.active ? this.ally : null);
+      let target: Phaser.Physics.Arcade.Sprite | null = null;
+      let nearestDist = Infinity;
+      for (const candidate of [this.player, this.ally]) {
+        if (candidate?.active) {
+          const d = Phaser.Math.Distance.Between(enemy.x, enemy.y, candidate.x, candidate.y);
+          if (d < nearestDist) {
+            nearestDist = d;
+            target = candidate;
+          }
+        }
+      }
       if (!target) {
         enemy.setVelocityX(0);
         enemy.play(`${dinoKey}_idle`, true);
@@ -409,6 +419,9 @@ export class GameScene extends Phaser.Scene {
         } else {
           enemy.setVelocityX(Math.cos(angle) * 300);
           this.enemyDirections[0] = Math.cos(angle) > 0 ? 1 : -1;
+          if (onGround) {
+            enemy.setVelocityY(-600);
+          }
         }
       } else {
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, target.x, target.y);
@@ -594,8 +607,23 @@ export class GameScene extends Phaser.Scene {
       this.ally.setVelocityX(0);
     }
 
+    if (!this.player?.active && state === 'Hostile') {
+      state = 'Loyal';
+      color = '#00ff00';
+    }
+
     if (state === 'Loyal') {
-      const target = this.enemies.find(e => e.active);
+      let target: Phaser.Physics.Arcade.Sprite | null = null;
+      let nearestDist = Infinity;
+      for (const e of this.enemies) {
+        if (e.active) {
+          const d = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, e.x, e.y);
+          if (d < nearestDist) {
+            nearestDist = d;
+            target = e;
+          }
+        }
+      }
       if (!target) {
         this.ally.setVelocityX(0);
       } else if (this.allyHasGun && this.allyGun) {
@@ -611,6 +639,9 @@ export class GameScene extends Phaser.Scene {
         } else {
           const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
           this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+          if (this.ally.body?.blocked.down) {
+            this.ally.setVelocityY(-600);
+          }
         }
       } else {
         const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, target.x, target.y);
@@ -645,6 +676,9 @@ export class GameScene extends Phaser.Scene {
         } else {
           const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
           this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+          if (this.ally.body?.blocked.down) {
+            this.ally.setVelocityY(-600);
+          }
         }
       } else {
         const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
