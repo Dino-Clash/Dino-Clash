@@ -73,11 +73,12 @@ export class GameScene extends Phaser.Scene {
     platHigh.setStrokeStyle(1, 0x4a7023);
     this.platforms.add(platHigh);
 
-    this.player = this.physics.add.sprite(100, 450, 'dino_doux');
+    this.player = this.physics.add.sprite(400, 100, 'dino_doux');
+    this.player.setScale(4);
     this.player.setCollideWorldBounds(true);
 
     if (this.player.body) {
-      this.player.body.setGravityY(0);
+      this.player.refreshBody();
     }
 
     if (this.player && this.platforms) {
@@ -113,12 +114,16 @@ export class GameScene extends Phaser.Scene {
 
     const onGround = this.player.body?.blocked.down ?? false;
 
+    if (onGround && (this.keySpace?.isDown || this.cursors?.up.isDown)) {
+      this.player.setVelocityY(-600);
+    }
+
     if (this.keyA?.isDown) {
-      this.player.setVelocityX(-300);
+      this.player.setVelocityX(-150);
       this.player.setFlipX(true);
       if (onGround) this.player.play('doux_run', true);
     } else if (this.keyD?.isDown) {
-      this.player.setVelocityX(300);
+      this.player.setVelocityX(150);
       this.player.setFlipX(false);
       if (onGround) this.player.play('doux_run', true);
     } else {
@@ -126,8 +131,7 @@ export class GameScene extends Phaser.Scene {
       if (onGround) this.player.play('doux_idle', true);
     }
 
-    if ((this.keySpace?.isDown || this.cursors?.up.isDown) && onGround) {
-      this.player.setVelocityY(-600);
+    if (!onGround) {
       this.player.play('doux_jump', true);
     }
   }
