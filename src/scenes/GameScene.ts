@@ -26,7 +26,7 @@ export class GameScene extends Phaser.Scene {
   private playerHasGun: boolean = false;
   private allyHasGun: boolean = false;
   private lastPlayerShootTime: number = 0;
-  private bullets: Phaser.Physics.Arcade.Group | null = null;
+  private bullets: Phaser.GameObjects.Group | null = null;
 
   private playerInvulnerable: boolean = false;
   private allyInvulnerable: boolean = false;
@@ -216,20 +216,20 @@ export class GameScene extends Phaser.Scene {
       this.allyGun = this.add.image(this.ally!.x, this.ally!.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
     }
 
-    this.bullets = this.physics.add.group({ allowGravity: false });
+    this.bullets = this.add.group();
 
-    this.physics.add.overlap(this.bullets, this.platforms, (bullet) => {
+    this.physics.add.overlap(this.bullets!, this.platforms, (bullet) => {
       (bullet as Phaser.GameObjects.Rectangle).destroy();
     });
 
-    this.physics.add.overlap(this.bullets, this.player!, (bullet) => {
+    this.physics.add.overlap(this.bullets!, this.player!, (bullet) => {
       const b = bullet as Phaser.GameObjects.Rectangle;
       if (b.getData('owner') !== 'enemy') return;
       this.applyDamageTo(this.player!, this.player!.x - b.x > 0 ? 1 : -1);
       b.destroy();
     });
 
-    this.physics.add.overlap(this.bullets, this.ally!, (bullet) => {
+    this.physics.add.overlap(this.bullets!, this.ally!, (bullet) => {
       const b = bullet as Phaser.GameObjects.Rectangle;
       const owner = b.getData('owner') as string;
       if (owner !== 'enemy' && owner !== 'player') return;
@@ -237,7 +237,7 @@ export class GameScene extends Phaser.Scene {
       b.destroy();
     });
 
-    this.physics.add.overlap(this.bullets, this.enemyGroup!, (bullet, enemy) => {
+    this.physics.add.overlap(this.bullets!, this.enemyGroup!, (bullet, enemy) => {
       const b = bullet as Phaser.GameObjects.Rectangle;
       const owner = b.getData('owner') as string;
       if (owner !== 'ally' && owner !== 'player') return;
@@ -413,20 +413,7 @@ export class GameScene extends Phaser.Scene {
         if (dist < 40 && this.time.now > this.lastEnemyShootTimes[1] + 1000) {
           this.lastEnemyShootTimes[1] = this.time.now;
           enemy.play(`${dinoKey}_attack`);
-          const eb = enemy.body as Phaser.Physics.Arcade.Body;
-          if (eb) {
-            const facingRight = !enemy.flipX;
-            const ax = facingRight ? eb.x + eb.width : eb.x - 20;
-            const ay = eb.y - 4;
-            const attackRect = new Phaser.Geom.Rectangle(ax, ay, 20, eb.height + 8);
-            const tb = target.body as Phaser.Physics.Arcade.Body;
-            if (tb) {
-              const targetRect = new Phaser.Geom.Rectangle(tb.x, tb.y, tb.width, tb.height);
-              if (Phaser.Geom.Rectangle.Overlaps(attackRect, targetRect)) {
-                this.applyDamageTo(target, facingRight ? 1 : -1);
-              }
-            }
-          }
+          this.applyDamageTo(target, !enemy.flipX ? 1 : -1);
         }
       }
     }
@@ -462,7 +449,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private fireBullet(x: number, y: number, angle: number, owner: string): void {
-    const bullet = this.add.rectangle(x, y, 8, 4, 0xffff00).setDepth(10);
+    const bx = x + Math.cos(angle) * 15;
+    const by = y + Math.sin(angle) * 15;
+    const bullet = this.add.rectangle(bx, by, 8, 4, 0xffff00).setDepth(10);
     this.physics.add.existing(bullet, false);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
@@ -474,29 +463,22 @@ export class GameScene extends Phaser.Scene {
 
   private checkMeleeHit(): void {
     if (!this.player?.active) return;
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    if (!body) return;
-
     const facingRight = !this.player.flipX;
-    const ax = facingRight ? body.x + body.width : body.x - 20;
-    const ay = body.y - 4;
-    const attackRect = new Phaser.Geom.Rectangle(ax, ay, 20, body.height + 8);
 
     for (const enemy of this.enemies) {
       if (!enemy.active) continue;
-      const eb = enemy.body as Phaser.Physics.Arcade.Body;
-      if (!eb) continue;
-      const enemyRect = new Phaser.Geom.Rectangle(eb.x, eb.y, eb.width, eb.height);
-      if (Phaser.Geom.Rectangle.Overlaps(attackRect, enemyRect)) {
-        this.applyDamageTo(enemy, facingRight ? 1 : -1);
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+      if (dist < 40) {
+        const inFront = facingRight ? enemy.x > this.player.x : enemy.x < this.player.x;
+        if (inFront) this.applyDamageTo(enemy, facingRight ? 1 : -1);
       }
     }
 
     if (this.ally?.active) {
-      const ab = this.ally.body as Phaser.Physics.Arcade.Body;
-      if (ab) {
-        const allyRect = new Phaser.Geom.Rectangle(ab.x, ab.y, ab.width, ab.height);
-        if (Phaser.Geom.Rectangle.Overlaps(attackRect, allyRect)) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.ally.x, this.ally.y);
+      if (dist < 40) {
+        const inFront = facingRight ? this.ally.x > this.player.x : this.ally.x < this.player.x;
+        if (inFront) {
           this.applyDamageTo(this.ally, facingRight ? 1 : -1);
           this.loyalty = Math.max(this.loyalty - 10, -100);
         }
@@ -595,20 +577,7 @@ export class GameScene extends Phaser.Scene {
         if (dist < 40 && this.time.now > this.lastAllyShootTime + 1000) {
           this.lastAllyShootTime = this.time.now;
           this.ally.play('vita_attack');
-          const ab = this.ally.body as Phaser.Physics.Arcade.Body;
-          if (ab) {
-            const facingRight = !this.ally.flipX;
-            const ax = facingRight ? ab.x + ab.width : ab.x - 20;
-            const ay = ab.y - 4;
-            const attackRect = new Phaser.Geom.Rectangle(ax, ay, 20, ab.height + 8);
-            const tb = target.body as Phaser.Physics.Arcade.Body;
-            if (tb) {
-              const targetRect = new Phaser.Geom.Rectangle(tb.x, tb.y, tb.width, tb.height);
-              if (Phaser.Geom.Rectangle.Overlaps(attackRect, targetRect)) {
-                this.applyDamageTo(target, facingRight ? 1 : -1);
-              }
-            }
-          }
+          this.applyDamageTo(target, !this.ally.flipX ? 1 : -1);
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
           this.ally.setVelocityX(Math.cos(angle) * 300);
@@ -637,20 +606,7 @@ export class GameScene extends Phaser.Scene {
         if (dist < 40 && this.time.now > this.lastAllyShootTime + 1000) {
           this.lastAllyShootTime = this.time.now;
           this.ally.play('vita_attack');
-          const ab = this.ally.body as Phaser.Physics.Arcade.Body;
-          if (ab) {
-            const facingRight = !this.ally.flipX;
-            const ax = facingRight ? ab.x + ab.width : ab.x - 20;
-            const ay = ab.y - 4;
-            const attackRect = new Phaser.Geom.Rectangle(ax, ay, 20, ab.height + 8);
-            const pb = this.player.body as Phaser.Physics.Arcade.Body;
-            if (pb) {
-              const playerRect = new Phaser.Geom.Rectangle(pb.x, pb.y, pb.width, pb.height);
-              if (Phaser.Geom.Rectangle.Overlaps(attackRect, playerRect)) {
-                this.applyDamageTo(this.player, facingRight ? 1 : -1);
-              }
-            }
-          }
+          this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1);
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
           this.ally.setVelocityX(Math.cos(angle) * 300);
