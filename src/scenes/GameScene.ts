@@ -57,28 +57,26 @@ export class GameScene extends Phaser.Scene {
     ground.setStrokeStyle(1, 0x2d4a15);
     this.platforms.add(ground);
 
-    const platLeft = this.add.rectangle(150, 440, 160, 16, 0x6b8e23);
-    platLeft.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platLeft);
+    const platMidLeft = this.add.rectangle(80, 396, 140, 16, 0x6b8e23);
+    platMidLeft.setStrokeStyle(1, 0x4a7023);
+    this.platforms.add(platMidLeft);
 
-    const platCenter = this.add.rectangle(400, 340, 192, 16, 0x6b8e23);
-    platCenter.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platCenter);
+    const platMidRight = this.add.rectangle(720, 396, 140, 16, 0x6b8e23);
+    platMidRight.setStrokeStyle(1, 0x4a7023);
+    this.platforms.add(platMidRight);
 
-    const platRight = this.add.rectangle(650, 440, 160, 16, 0x6b8e23);
-    platRight.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platRight);
-
-    const platHigh = this.add.rectangle(300, 250, 128, 16, 0x8fbc3b);
+    const platHigh = this.add.rectangle(400, 220, 140, 16, 0x8fbc3b);
     platHigh.setStrokeStyle(1, 0x4a7023);
     this.platforms.add(platHigh);
 
     this.player = this.physics.add.sprite(400, 100, 'dino_doux');
-    this.player.setScale(4);
+    this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
 
     if (this.player.body) {
       this.player.refreshBody();
+      this.player.body.setSize(14, 18);
+      this.player.body.setOffset(5, 3);
     }
 
     if (this.player && this.platforms) {
