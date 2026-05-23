@@ -167,11 +167,11 @@ export class GameScene extends Phaser.Scene {
       this.enemies.push(enemy);
       this.enemyGroup.add(enemy);
 
-      const gun = this.add.image(spawn.x, spawn.y, 'weapon_gun').setDepth(5);
+      const gun = this.add.image(spawn.x, spawn.y, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
       this.enemyGuns.push(gun);
     }
 
-    this.ally = this.physics.add.sprite(400, 180, 'dino_vita');
+    this.ally = this.physics.add.sprite(440, 100, 'dino_vita');
     this.ally.setScale(2);
     this.ally.setCollideWorldBounds(true);
     this.ally.setData('hp', 3);
@@ -187,9 +187,9 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.ally, this.platforms);
     }
 
-    this.allyGun = this.add.image(400, 180, 'weapon_gun').setDepth(5);
+    this.allyGun = this.add.image(440, 100, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
 
-    this.playerGun = this.add.image(400, 100, 'weapon_gun').setDepth(5);
+    this.playerGun = this.add.image(400, 100, 'weapon_gun').setDisplaySize(20, 15).setDepth(5);
 
     this.bullets = this.physics.add.group({ allowGravity: false });
 
@@ -385,7 +385,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private fireBullet(x: number, y: number, angle: number, owner: string): void {
-    const bullet = this.add.rectangle(x, y, 8, 3, 0xffff00);
+    const bullet = this.add.rectangle(x, y, 12, 6, 0xffff00).setDepth(8);
     this.physics.add.existing(bullet, false);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
