@@ -283,6 +283,7 @@ export class GameScene extends Phaser.Scene {
       this.player.y + Math.sin(playerAngle) * radius,
     );
     this.playerGun.setRotation(playerAngle);
+    this.playerGun.setFlipY(Math.abs(playerAngle) > Math.PI / 2);
 
     for (let i = 0; i < this.enemies.length; i++) {
       const enemy = this.enemies[i];
@@ -298,6 +299,7 @@ export class GameScene extends Phaser.Scene {
         enemy.y + Math.sin(angle) * radius,
       );
       this.enemyGuns[i].setRotation(angle);
+      this.enemyGuns[i].setFlipY(Math.abs(angle) > Math.PI / 2);
       this.enemyGuns[i].setVisible(true);
     }
 
@@ -312,6 +314,7 @@ export class GameScene extends Phaser.Scene {
           this.ally.y + Math.sin(angle) * radius,
         );
         this.allyGun.setRotation(angle);
+        this.allyGun.setFlipY(Math.abs(angle) > Math.PI / 2);
       }
     }
   }
@@ -385,7 +388,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private fireBullet(x: number, y: number, angle: number, owner: string): void {
-    const bullet = this.add.rectangle(x, y, 12, 6, 0xffff00).setDepth(8);
+    const bullet = this.add.rectangle(x, y, 8, 4, 0xffff00).setDepth(10);
     this.physics.add.existing(bullet, false);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
@@ -485,6 +488,14 @@ export class GameScene extends Phaser.Scene {
     if (state === 'Hostile' && this.player?.active) {
       const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
       this.ally.setVelocityX(Math.cos(angle) * 150);
+    }
+
+    const allyVx = this.ally.body?.velocity.x ?? 0;
+    if (Math.abs(allyVx) > 0) {
+      this.ally.setFlipX(allyVx < 0);
+      this.ally.play('vita_run', true);
+    } else {
+      this.ally.play('vita_idle', true);
     }
 
     if (this.allyFSMText) {
