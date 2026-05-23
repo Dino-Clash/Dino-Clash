@@ -8,6 +8,12 @@ export class GameScene extends Phaser.Scene {
   private keyD: Phaser.Input.Keyboard.Key | null = null;
   private keySpace: Phaser.Input.Keyboard.Key | null = null;
 
+  private enemies: Phaser.Physics.Arcade.Sprite[] = [];
+  private enemyDirections: number[] = [1, -1];
+  private ally: Phaser.Physics.Arcade.Sprite | null = null;
+  private loyalty: number = 100;
+  private allyFSMText: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -83,26 +89,72 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player, this.platforms);
     }
 
-    this.anims.create({
-      key: 'doux_idle',
-      frames: this.anims.generateFrameNumbers('dino_doux', { start: 0, end: 3 }),
-      frameRate: 8,
-      repeat: -1,
-    });
+    const dinoKeys = ['doux', 'mort', 'vita'];
+    for (const key of dinoKeys) {
+      this.anims.create({
+        key: `${key}_idle`,
+        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 0, end: 3 }),
+        frameRate: 8,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: `${key}_run`,
+        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 9 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: `${key}_jump`,
+        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 5 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
 
-    this.anims.create({
-      key: 'doux_run',
-      frames: this.anims.generateFrameNumbers('dino_doux', { start: 4, end: 9 }),
-      frameRate: 10,
-      repeat: -1,
-    });
+    const enemySpawns = [
+      { x: 80, y: 360 },
+      { x: 720, y: 360 },
+    ];
 
-    this.anims.create({
-      key: 'doux_jump',
-      frames: this.anims.generateFrameNumbers('dino_doux', { start: 4, end: 5 }),
-      frameRate: 6,
-      repeat: -1,
-    });
+    for (let i = 0; i < enemySpawns.length; i++) {
+      const spawn = enemySpawns[i];
+      const enemy = this.physics.add.sprite(spawn.x, spawn.y, 'dino_mort');
+      enemy.setScale(2);
+      enemy.setCollideWorldBounds(true);
+
+      if (enemy.body) {
+        enemy.refreshBody();
+        enemy.body.setSize(14, 18);
+        enemy.body.setOffset(5, 3);
+      }
+
+      if (this.platforms) {
+        this.physics.add.collider(enemy, this.platforms);
+      }
+
+      enemy.setVelocityX(this.enemyDirections[i] * 150);
+      this.enemies.push(enemy);
+    }
+
+    this.ally = this.physics.add.sprite(400, 180, 'dino_vita');
+    this.ally.setScale(2);
+    this.ally.setCollideWorldBounds(true);
+
+    if (this.ally.body) {
+      this.ally.refreshBody();
+      this.ally.body.setSize(14, 18);
+      this.ally.body.setOffset(5, 3);
+    }
+
+    if (this.ally && this.platforms) {
+      this.physics.add.collider(this.ally, this.platforms);
+    }
+
+    this.allyFSMText = this.add.text(0, 0, 'Loyal', {
+      fontSize: '12px',
+      color: '#00ff00',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5, 1).setDepth(10);
 
     this.player.play('doux_idle');
   }
@@ -132,5 +184,88 @@ export class GameScene extends Phaser.Scene {
     if (!onGround) {
       this.player.play('doux_jump', true);
     }
+
+    this.updateAllyFSM();
+    this.updateEnemyPatrol();
+  }
+
+  private updateAllyFSM(): void {
+    if (!this.ally || !this.ally.active) return;
+
+    let state: string;
+    let color: string;
+
+    if (this.loyalty > 20) {
+      state = 'Loyal';
+      color = '#00ff00';
+    } else if (this.loyalty >= -20) {
+      state = 'Inactive';
+      color = '#ffff00';
+    } else {
+      state = 'Hostile';
+      color = '#ff0000';
+    }
+
+    if (state === 'Inactive') {
+      this.ally.setVelocityX(0);
+    }
+
+    if (this.allyFSMText) {
+      this.allyFSMText.setText(state);
+      this.allyFSMText.setColor(color);
+      this.allyFSMText.setPosition(this.ally.x, this.ally.y - 30);
+    }
+  }
+
+  private updateEnemyPatrol(): void {
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (!enemy.active) continue;
+
+      const onGround = enemy.body?.blocked.down ?? false;
+      const dir = this.enemyDirections[i];
+
+      if (onGround && !this.hasGroundAhead(enemy, dir)) {
+        this.enemyDirections[i] *= -1;
+        enemy.setVelocityX(this.enemyDirections[i] * 150);
+      }
+
+      enemy.setFlipX(this.enemyDirections[i] < 0);
+
+      if (!onGround) {
+        enemy.play('mort_jump', true);
+      } else if (enemy.body?.velocity.x !== 0) {
+        enemy.play('mort_run', true);
+      } else {
+        enemy.play('mort_idle', true);
+      }
+    }
+  }
+
+  private hasGroundAhead(sprite: Phaser.Physics.Arcade.Sprite, direction: number): boolean {
+    if (!this.platforms) return false;
+
+    const body = sprite.body as Phaser.Physics.Arcade.Body;
+    if (!body) return false;
+
+    const sensorX = direction > 0 ? body.x + body.width : body.x - 4;
+    const sensorY = body.y + body.height + 2;
+    const sensorRect = new Phaser.Geom.Rectangle(sensorX, sensorY, 4, 4);
+
+    const children = this.platforms.getChildren();
+    for (const child of children) {
+      const platBody = (child as Phaser.GameObjects.Rectangle).body as Phaser.Physics.Arcade.StaticBody;
+      if (!platBody) continue;
+
+      const platRect = new Phaser.Geom.Rectangle(
+        platBody.x, platBody.y,
+        platBody.width, platBody.height,
+      );
+
+      if (Phaser.Geom.Rectangle.Overlaps(sensorRect, platRect)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
