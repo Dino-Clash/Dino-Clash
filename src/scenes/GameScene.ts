@@ -287,22 +287,26 @@ export class GameScene extends Phaser.Scene {
       this.player.setVelocityY(-600);
     }
 
+    const pBusy = this.player.anims.isPlaying &&
+      (this.player.anims.currentAnim?.key === 'doux_kick' ||
+       this.player.anims.currentAnim?.key === 'doux_hurt');
+
     if (this.keyA?.isDown) {
       this.player.setVelocityX(-300);
-      if (onGround) this.player.play('doux_run', true);
+      if (onGround && !pBusy) this.player.play('doux_run', true);
     } else if (this.keyD?.isDown) {
       this.player.setVelocityX(300);
-      if (onGround) this.player.play('doux_run', true);
+      if (onGround && !pBusy) this.player.play('doux_run', true);
     } else {
       this.player.setVelocityX(0);
-      if (onGround) this.player.play('doux_idle', true);
+      if (onGround && !pBusy) this.player.play('doux_idle', true);
     }
 
     const pVx = this.player.body?.velocity.x ?? 0;
     if (pVx < 0) this.player.setFlipX(true);
     else if (pVx > 0) this.player.setFlipX(false);
 
-    if (!onGround) {
+    if (!onGround && !pBusy) {
       this.player.play('doux_jump', true);
     }
 
@@ -384,18 +388,6 @@ export class GameScene extends Phaser.Scene {
         enemy.setVelocityX(this.enemyDirections[i] * 300);
       }
 
-      const eVx = enemy.body?.velocity.x ?? 0;
-      if (eVx < 0) enemy.setFlipX(true);
-      else if (eVx > 0) enemy.setFlipX(false);
-
-      if (!onGround) {
-        enemy.play(`${dinoKey}_jump`, true);
-      } else if (Math.abs(enemy.body?.velocity.x ?? 0) > 0) {
-        enemy.play(`${dinoKey}_run`, true);
-      } else {
-        enemy.play(`${dinoKey}_idle`, true);
-      }
-
       const target = this.player?.active ? this.player : (this.ally?.active ? this.ally : null);
       if (!target) {
         enemy.setVelocityX(0);
@@ -431,6 +423,23 @@ export class GameScene extends Phaser.Scene {
             enemy.play(`${dinoKey}_kick`);
             this.applyDamageTo(target, !enemy.flipX ? 1 : -1);
           }
+        }
+      }
+
+      const eVx = enemy.body?.velocity.x ?? 0;
+      if (eVx < 0) enemy.setFlipX(true);
+      else if (eVx > 0) enemy.setFlipX(false);
+
+      const eBusy = enemy.anims.isPlaying &&
+        (enemy.anims.currentAnim?.key === `${dinoKey}_kick` ||
+         enemy.anims.currentAnim?.key === `${dinoKey}_hurt`);
+      if (!eBusy) {
+        if (!onGround) {
+          enemy.play(`${dinoKey}_jump`, true);
+        } else if (Math.abs(eVx) > 0) {
+          enemy.play(`${dinoKey}_run`, true);
+        } else {
+          enemy.play(`${dinoKey}_idle`, true);
         }
       }
     }
@@ -654,12 +663,17 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const allyVx = this.ally.body?.velocity.x ?? 0;
-    if (Math.abs(allyVx) > 0) {
-      this.ally.setFlipX(allyVx < 0);
-      this.ally.play('vita_run', true);
-    } else {
-      this.ally.play('vita_idle', true);
+    const aBusy = this.ally.anims.isPlaying &&
+      (this.ally.anims.currentAnim?.key === 'vita_kick' ||
+       this.ally.anims.currentAnim?.key === 'vita_hurt');
+    if (!aBusy) {
+      const allyVx = this.ally.body?.velocity.x ?? 0;
+      if (Math.abs(allyVx) > 0) {
+        this.ally.setFlipX(allyVx < 0);
+        this.ally.play('vita_run', true);
+      } else {
+        this.ally.play('vita_idle', true);
+      }
     }
 
     if (this.allyFSMText) {
