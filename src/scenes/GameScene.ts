@@ -45,6 +45,11 @@ export class GameScene extends Phaser.Scene {
 
   private enemyStuckSince: number[] = [-1, -1];
   private allyStuckSince: number = -1;
+  private playerDinoKey: string = 'doux';
+  private allyDinoKey: string = 'vita';
+  private enemyDinoKeys: string[] = ['mort', 'tard'];
+  private currentStageIndex: number = 0;
+  private bgImage: Phaser.GameObjects.Image | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -82,8 +87,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(400, 300, 'bg_1').setDisplaySize(800, 600).setScrollFactor(0);
-
     this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
     this.keyA = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A) ?? null;
     this.keyD = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D) ?? null;
@@ -92,51 +95,16 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, -500, 800, 2000);
 
-    this.platforms = this.physics.add.staticGroup();
+    const sceneData = this.scene.settings.data as { playerDino?: string } | undefined;
+    this.playerDinoKey = sceneData?.playerDino ?? 'doux';
+    this.currentStageIndex = 0;
+    this.setupStage(0);
 
-    const leftWall = this.add.rectangle(-10, 300, 20, 600).setVisible(false);
-    this.platforms.add(leftWall);
-
-    const rightWall = this.add.rectangle(810, 300, 20, 600).setVisible(false);
-    this.platforms.add(rightWall);
-
-    const platBottomLeft = this.add.rectangle(150, 480, 200, 16, 0x4a7023);
-    platBottomLeft.setStrokeStyle(1, 0x2d4a15);
-    this.platforms.add(platBottomLeft);
-
-    const platBottomRight = this.add.rectangle(650, 480, 200, 16, 0x4a7023);
-    platBottomRight.setStrokeStyle(1, 0x2d4a15);
-    this.platforms.add(platBottomRight);
-
-    const platMidLeft = this.add.rectangle(80, 360, 160, 16, 0x6b8e23);
-    platMidLeft.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platMidLeft);
-
-    const platMidCenter = this.add.rectangle(400, 360, 160, 16, 0x6b8e23);
-    platMidCenter.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platMidCenter);
-
-    const platMidRight = this.add.rectangle(720, 360, 160, 16, 0x6b8e23);
-    platMidRight.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platMidRight);
-
-    const platUpperLeft = this.add.rectangle(150, 240, 160, 16, 0x8fbc3b);
-    platUpperLeft.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platUpperLeft);
-
-    const platUpperRight = this.add.rectangle(650, 240, 160, 16, 0x8fbc3b);
-    platUpperRight.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platUpperRight);
-
-    const platTop = this.add.rectangle(400, 120, 180, 16, 0x8fbc3b);
-    platTop.setStrokeStyle(1, 0x4a7023);
-    this.platforms.add(platTop);
-
-    this.player = this.physics.add.sprite(130, 232, 'dino_doux');
+    this.player = this.physics.add.sprite(130, 232, `dino_${this.playerDinoKey}`);
     this.player.setScale(2);
     this.player.setData('hp', 3);
     this.player.setData('invulnUntil', 0);
-    this.player.setData('dinoKey', 'doux');
+    this.player.setData('dinoKey', this.playerDinoKey);
 
     if (this.player.body) {
       this.player.refreshBody();
@@ -148,6 +116,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player, this.platforms, undefined, this.canCollideWithPlatform, this);
     }
 
+    if (!this.anims.exists('doux_idle')) {
     const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
     for (const key of dinoKeys) {
       this.anims.create({
@@ -187,8 +156,13 @@ export class GameScene extends Phaser.Scene {
         repeat: -1,
       });
     }
+    }
 
     this.enemyGroup = this.add.group();
+
+    const uniqueKeys = this.getRandomDinoKeys(this.playerDinoKey);
+    this.allyDinoKey = uniqueKeys[0];
+    this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
 
     const enemySpawns = [
       { x: 630, y: 232 },
@@ -197,7 +171,7 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < enemySpawns.length; i++) {
       const spawn = enemySpawns[i];
-      const dinoName = i === 0 ? 'mort' : 'tard';
+      const dinoName = this.enemyDinoKeys[i];
       const enemy = this.physics.add.sprite(spawn.x, spawn.y, `dino_${dinoName}`);
       enemy.setScale(2);
       enemy.setData('hp', 3);
@@ -226,11 +200,11 @@ export class GameScene extends Phaser.Scene {
       'weapon_gun',
     ).setDisplaySize(36, 26).setDepth(0);
 
-    this.ally = this.physics.add.sprite(170, 232, 'dino_vita');
+    this.ally = this.physics.add.sprite(170, 232, `dino_${this.allyDinoKey}`);
     this.ally.setScale(2);
     this.ally.setData('hp', 3);
     this.ally.setData('invulnUntil', 0);
-    this.ally.setData('dinoKey', 'vita');
+    this.ally.setData('dinoKey', this.allyDinoKey);
 
     if (this.ally.body) {
       this.ally.refreshBody();
@@ -255,7 +229,7 @@ export class GameScene extends Phaser.Scene {
 
     this.bullets = this.add.group();
 
-    this.physics.add.collider(this.bullets!, this.platforms, (bullet) => {
+    this.physics.add.collider(this.bullets!, this.platforms!, (bullet) => {
       (bullet as Phaser.GameObjects.Rectangle).destroy();
     });
 
@@ -298,7 +272,7 @@ export class GameScene extends Phaser.Scene {
         if (this.time.now > this.lastPlayerAttackTime + 1000) {
           this.isPlayerAttacking = true;
           this.lastPlayerAttackTime = this.time.now;
-          this.player!.play('doux_kick');
+          this.player!.play(`${this.playerDinoKey}_kick`);
         }
       }
     });
@@ -311,8 +285,7 @@ export class GameScene extends Phaser.Scene {
 
     const playerDinoKey = this.player?.getData('dinoKey') as string ?? 'doux';
     const pColor = this.getDinoColor(playerDinoKey);
-    const enemyDinoKeys = ['mort', 'tard'];
-    const randomEnemyKey = enemyDinoKeys[Phaser.Math.Between(0, 1)];
+    const randomEnemyKey = this.enemyDinoKeys[Phaser.Math.Between(0, 1)];
     this.enemyScoreColor = this.getDinoColor(randomEnemyKey);
 
     this.playerScoreText = this.add.text(390, 15, '0', {
@@ -336,7 +309,7 @@ export class GameScene extends Phaser.Scene {
       color: this.enemyScoreColor,
     }).setOrigin(0, 0).setDepth(100);
 
-    this.player.play('doux_idle');
+    this.player.play(`${this.playerDinoKey}_idle`);
     this.startCountdown();
   }
 
@@ -350,18 +323,18 @@ export class GameScene extends Phaser.Scene {
       }
 
       const pBusy = this.player.anims.isPlaying &&
-        (this.player.anims.currentAnim?.key === 'doux_kick' ||
-          this.player.anims.currentAnim?.key === 'doux_hurt');
+        (this.player.anims.currentAnim?.key === `${this.playerDinoKey}_kick` ||
+          this.player.anims.currentAnim?.key === `${this.playerDinoKey}_hurt`);
 
       if (this.keyA?.isDown) {
         this.player.setVelocityX(-300);
-        if (onGround && !pBusy) this.player.play('doux_run', true);
+        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
       } else if (this.keyD?.isDown) {
         this.player.setVelocityX(300);
-        if (onGround && !pBusy) this.player.play('doux_run', true);
+        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
       } else {
         this.player.setVelocityX(0);
-        if (onGround && !pBusy) this.player.play('doux_idle', true);
+        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_idle`, true);
       }
 
       const pVx = this.player.body?.velocity.x ?? 0;
@@ -369,13 +342,13 @@ export class GameScene extends Phaser.Scene {
       else if (pVx > 0) this.player.setFlipX(false);
 
       if (!onGround && !pBusy) {
-        this.player.play('doux_jump', true);
+        this.player.play(`${this.playerDinoKey}_jump`, true);
       }
 
       if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
         this.isPlayerAttacking = true;
         this.lastPlayerAttackTime = this.time.now;
-        this.player.play('doux_kick');
+        this.player.play(`${this.playerDinoKey}_kick`);
       }
 
       if (this.isPlayerAttacking) {
@@ -467,6 +440,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setPosition(x, y);
     sprite.setActive(true).setVisible(true);
     sprite.setAlpha(1);
+    sprite.setTexture(`dino_${dinoKey}`);
     sprite.setData('hp', 3);
     sprite.setData('invulnUntil', 0);
     sprite.setData('dinoKey', dinoKey);
@@ -494,16 +468,27 @@ export class GameScene extends Phaser.Scene {
 
     this.bullets?.clear(true, true);
 
-    this.respawnCharacter(this.player!, 130, 232, 'doux');
+    this.currentStageIndex = (this.currentStageIndex + 1) % 5;
+    this.setupStage(this.currentStageIndex);
 
-    this.respawnCharacter(this.ally!, 170, 232, 'vita');
+    const uniqueKeys = this.getRandomDinoKeys(this.playerDinoKey);
+    this.allyDinoKey = uniqueKeys[0];
+    this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
+
+    const p1 = this.getRandomSpawnPosition();
+    this.respawnCharacter(this.player!, p1.x, p1.y, this.playerDinoKey);
+
+    const p2 = this.getRandomSpawnPosition();
+    this.respawnCharacter(this.ally!, p2.x, p2.y, this.allyDinoKey);
     if (this.allyFSMText) {
       this.allyFSMText.setVisible(true);
     }
 
     this.enemyDirections = [Math.random() < 0.5 ? 1 : -1, Math.random() < 0.5 ? 1 : -1];
-    this.respawnCharacter(this.enemies[0], 630, 232, 'mort');
-    this.respawnCharacter(this.enemies[1], 670, 232, 'tard');
+    const p3 = this.getRandomSpawnPosition();
+    this.respawnCharacter(this.enemies[0], p3.x, p3.y, this.enemyDinoKeys[0]);
+    const p4 = this.getRandomSpawnPosition();
+    this.respawnCharacter(this.enemies[1], p4.x, p4.y, this.enemyDinoKeys[1]);
 
     const playerGetsGun = Math.random() < 0.5;
     this.playerHasGun = playerGetsGun;
@@ -930,7 +915,7 @@ export class GameScene extends Phaser.Scene {
           this.ally.setVelocityX(0);
           if (this.time.now > this.lastAllyShootTime + 1000) {
             this.lastAllyShootTime = this.time.now;
-            this.ally.play('vita_kick');
+            this.ally.play(`${this.allyDinoKey}_kick`);
             this.applyDamageTo(target, !this.ally.flipX ? 1 : -1, 'ally');
           }
         } else {
@@ -1004,7 +989,7 @@ export class GameScene extends Phaser.Scene {
           this.ally.setVelocityX(0);
           if (this.time.now > this.lastAllyShootTime + 1000) {
             this.lastAllyShootTime = this.time.now;
-            this.ally.play('vita_kick');
+            this.ally.play(`${this.allyDinoKey}_kick`);
             this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1, 'ally');
           }
         } else {
@@ -1030,14 +1015,14 @@ export class GameScene extends Phaser.Scene {
 
     const aBusy = this.ally.anims.isPlaying &&
       (this.ally.anims.currentAnim?.key === 'vita_kick' ||
-        this.ally.anims.currentAnim?.key === 'vita_hurt');
+        this.ally.anims.currentAnim?.key === `${this.allyDinoKey}_hurt`);
     if (!aBusy) {
       const allyVx = this.ally.body?.velocity.x ?? 0;
       if (Math.abs(allyVx) > 0) {
         this.ally.setFlipX(allyVx < 0);
-        this.ally.play('vita_run', true);
+        this.ally.play(`${this.allyDinoKey}_run`, true);
       } else {
-        this.ally.play('vita_idle', true);
+        this.ally.play(`${this.allyDinoKey}_idle`, true);
       }
     }
 
@@ -1156,10 +1141,103 @@ export class GameScene extends Phaser.Scene {
     const pBody = (platform as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.StaticBody;
     if (!sBody || !pBody) return false;
 
-    // walls (tall) remain fully solid
     if (pBody.height > 20) return true;
 
-    // one-way: only collide if sprite is near platform top and moving downward/resting
     return (sBody.y + sBody.height) <= (pBody.y + 16) && sBody.velocity.y >= -10;
+  }
+
+  private getRandomDinoKeys(exclude: string): string[] {
+    const pool = ['doux', 'mort', 'tard', 'vita'];
+    const available = pool.filter(k => k !== exclude);
+    Phaser.Utils.Array.Shuffle(available);
+    return available.slice(0, 3);
+  }
+
+  private setupStage(index: number): void {
+    const bgKey = `bg_${index + 1}`;
+    if (this.bgImage) {
+      this.bgImage.destroy();
+    }
+    this.bgImage = this.add.image(400, 300, bgKey).setDisplaySize(800, 600).setScrollFactor(0).setDepth(-1);
+
+    if (this.platforms) {
+      this.platforms.clear(true, true);
+    } else {
+      this.platforms = this.physics.add.staticGroup();
+    }
+
+    const leftWall = this.add.rectangle(-10, 300, 20, 600).setVisible(false);
+    this.platforms.add(leftWall);
+    const rightWall = this.add.rectangle(810, 300, 20, 600).setVisible(false);
+    this.platforms.add(rightWall);
+
+    interface PlatformDef {
+      x: number; y: number; w: number; h: number; color: number; stroke: number;
+    }
+
+    const layouts: PlatformDef[][] = [
+      [
+        { x: 150, y: 480, w: 200, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 650, y: 480, w: 200, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 80, y: 360, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 400, y: 360, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 720, y: 360, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 150, y: 240, w: 160, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 650, y: 240, w: 160, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 120, w: 180, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+      ],
+      [
+        { x: 400, y: 490, w: 300, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 200, y: 370, w: 180, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 600, y: 370, w: 180, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 400, y: 250, w: 200, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 250, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 550, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+      ],
+      [
+        { x: 150, y: 480, w: 150, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 400, y: 490, w: 160, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 650, y: 480, w: 150, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 120, y: 360, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 680, y: 360, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 400, y: 240, w: 240, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 130, w: 160, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+      ],
+      [
+        { x: 400, y: 480, w: 500, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 300, y: 370, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 500, y: 370, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 120, y: 270, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 250, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 680, y: 270, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+      ],
+      [
+        { x: 200, y: 480, w: 180, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 600, y: 480, w: 180, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
+        { x: 400, y: 380, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 80, y: 310, w: 140, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 720, y: 310, w: 140, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
+        { x: 250, y: 210, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 550, y: 210, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 110, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+      ],
+    ];
+
+    const stage = layouts[index];
+    for (const plat of stage) {
+      const rect = this.add.rectangle(plat.x, plat.y, plat.w, plat.h, plat.color);
+      rect.setStrokeStyle(1, plat.stroke);
+      this.platforms.add(rect);
+    }
+  }
+
+  private getRandomSpawnPosition(): { x: number; y: number } {
+    if (!this.platforms) return { x: 400, y: 232 };
+    const children = this.platforms.getChildren();
+    const visible = children.filter(c => (c as Phaser.GameObjects.Rectangle).visible);
+    if (visible.length === 0) return { x: 400, y: 232 };
+    const plat = Phaser.Utils.Array.GetRandom(visible) as Phaser.GameObjects.Rectangle;
+    return { x: plat.x, y: (plat.y as number) - 14 };
   }
 }
