@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 
 const DINO_KEYS = ['vita', 'mort', 'tard', 'doux'];
 
-const BG_W = 660;
-const BG_H = 420;
+const BG_W = 650;
+const BG_H = 415;
 const BG_X = 400;
 const BG_Y = 325;
 const QW = BG_W / 2;
@@ -41,7 +41,8 @@ export class MenuScene extends Phaser.Scene {
 
     this.add.image(400, 300, 'menu_frame').setDisplaySize(800, 600);
 
-    this.add.image(BG_X, BG_Y, 'menu_bg').setDisplaySize(BG_W, BG_H);
+    const bg = this.add.image(BG_X, BG_Y, 'menu_bg').setDisplaySize(BG_W, BG_H);
+    this.createBgMask(bg);
 
     for (let i = 0; i < DINO_KEYS.length; i++) {
       const key = DINO_KEYS[i];
@@ -75,6 +76,26 @@ export class MenuScene extends Phaser.Scene {
       if (!this.selectedDino) return;
       this.startGame();
     });
+  }
+
+  private createBgMask(bg: Phaser.GameObjects.Image): void {
+    const C = 16;
+    const bx = BG_X - BG_W / 2;
+    const by = BG_Y - BG_H / 2;
+    const g = this.add.graphics().setVisible(false);
+    g.fillStyle(0xffffff);
+    g.beginPath();
+    g.moveTo(bx, by + C);
+    g.lineTo(bx + C, by);
+    g.lineTo(bx + BG_W - C, by);
+    g.lineTo(bx + BG_W, by + C);
+    g.lineTo(bx + BG_W, by + BG_H - C);
+    g.lineTo(bx + BG_W - C, by + BG_H);
+    g.lineTo(bx + C, by + BG_H);
+    g.lineTo(bx, by + BG_H - C);
+    g.closePath();
+    g.fillPath();
+    bg.setMask(g.createGeometryMask());
   }
 
   private createAnimations(): void {
