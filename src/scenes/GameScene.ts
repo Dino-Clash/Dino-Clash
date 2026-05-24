@@ -44,7 +44,9 @@ export class GameScene extends Phaser.Scene {
   private roundFrozen: boolean = true;
 
   private enemyStuckSince: number[] = [-1, -1];
+  private enemyJumpStuckSince: number[] = [-1, -1];
   private allyStuckSince: number = -1;
+  private allyJumpStuckSince: number = -1;
   private playerDinoKey: string = 'doux';
   private allyDinoKey: string = 'vita';
   private enemyDinoKeys: string[] = ['mort', 'tard'];
@@ -100,7 +102,8 @@ export class GameScene extends Phaser.Scene {
     this.currentStageIndex = 0;
     this.setupStage(0);
 
-    this.player = this.physics.add.sprite(130, 232, `dino_${this.playerDinoKey}`);
+    const p0 = this.getSpawnPosition(0, 0);
+    this.player = this.physics.add.sprite(p0.x, p0.y, `dino_${this.playerDinoKey}`);
     this.player.setScale(2);
     this.player.setData('hp', 3);
     this.player.setData('invulnUntil', 0);
@@ -164,9 +167,11 @@ export class GameScene extends Phaser.Scene {
     this.allyDinoKey = uniqueKeys[0];
     this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
 
+    const e0 = this.getSpawnPosition(0, 2);
+    const e1 = this.getSpawnPosition(0, 3);
     const enemySpawns = [
-      { x: 630, y: 232 },
-      { x: 670, y: 232 },
+      { x: e0.x, y: e0.y },
+      { x: e1.x, y: e1.y },
     ];
 
     for (let i = 0; i < enemySpawns.length; i++) {
@@ -200,7 +205,8 @@ export class GameScene extends Phaser.Scene {
       'weapon_gun',
     ).setDisplaySize(36, 26).setDepth(0);
 
-    this.ally = this.physics.add.sprite(170, 232, `dino_${this.allyDinoKey}`);
+    const p1 = this.getSpawnPosition(0, 1);
+    this.ally = this.physics.add.sprite(p1.x, p1.y, `dino_${this.allyDinoKey}`);
     this.ally.setScale(2);
     this.ally.setData('hp', 3);
     this.ally.setData('invulnUntil', 0);
@@ -444,6 +450,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setData('hp', 3);
     sprite.setData('invulnUntil', 0);
     sprite.setData('dinoKey', dinoKey);
+    sprite.setData('dropStartY', undefined);
 
     const body = sprite.body as Phaser.Physics.Arcade.Body;
     if (body) {
@@ -471,23 +478,19 @@ export class GameScene extends Phaser.Scene {
     this.currentStageIndex = (this.currentStageIndex + 1) % 5;
     this.setupStage(this.currentStageIndex);
 
-    const uniqueKeys = this.getRandomDinoKeys(this.playerDinoKey);
-    this.allyDinoKey = uniqueKeys[0];
-    this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
-
-    const p1 = this.getRandomSpawnPosition();
+    const p1 = this.getSpawnPosition(this.currentStageIndex, 0);
     this.respawnCharacter(this.player!, p1.x, p1.y, this.playerDinoKey);
 
-    const p2 = this.getRandomSpawnPosition();
+    const p2 = this.getSpawnPosition(this.currentStageIndex, 1);
     this.respawnCharacter(this.ally!, p2.x, p2.y, this.allyDinoKey);
     if (this.allyFSMText) {
       this.allyFSMText.setVisible(true);
     }
 
     this.enemyDirections = [Math.random() < 0.5 ? 1 : -1, Math.random() < 0.5 ? 1 : -1];
-    const p3 = this.getRandomSpawnPosition();
+    const p3 = this.getSpawnPosition(this.currentStageIndex, 2);
     this.respawnCharacter(this.enemies[0], p3.x, p3.y, this.enemyDinoKeys[0]);
-    const p4 = this.getRandomSpawnPosition();
+    const p4 = this.getSpawnPosition(this.currentStageIndex, 3);
     this.respawnCharacter(this.enemies[1], p4.x, p4.y, this.enemyDinoKeys[1]);
 
     const playerGetsGun = Math.random() < 0.5;
@@ -517,7 +520,9 @@ export class GameScene extends Phaser.Scene {
     this.lastPlayerAttackTime = 0;
     this.isPlayerAttacking = false;
     this.enemyStuckSince = [-1, -1];
+    this.enemyJumpStuckSince = [-1, -1];
     this.allyStuckSince = -1;
+    this.allyJumpStuckSince = -1;
     this.startCountdown();
   }
 
@@ -570,17 +575,20 @@ export class GameScene extends Phaser.Scene {
       const enemy = this.enemies[i];
       if (!enemy.active) continue;
 
+      const dropStartY = enemy.getData('dropStartY');
+      if (dropStartY !== undefined) {
+        if (enemy.y > (dropStartY as number) + 2) {
+          enemy.setData('dropStartY', undefined);
+        } else {
+          continue;
+        }
+      }
+
       const onGround = enemy.body?.blocked.down ?? false;
-      const dir = this.enemyDirections[i];
       const dinoKey = enemy.getData('dinoKey') as string;
       const hasGun = i === this.enemyGunIndex;
 
-      if (onGround && !this.hasGroundAhead(enemy, dir)) {
-        this.enemyDirections[i] *= -1;
-        enemy.setVelocityX(this.enemyDirections[i] * 300);
-      } else {
-        enemy.setVelocityX(this.enemyDirections[i] * 300);
-      }
+      enemy.setVelocityX(this.enemyDirections[i] * 300);
 
       let target: Phaser.Physics.Arcade.Sprite | null = null;
       let nearestDist = Infinity;
@@ -603,17 +611,38 @@ export class GameScene extends Phaser.Scene {
       if (onGround && target.y > enemy.y + 30) {
         if (this.enemyStuckSince[i] < 0) {
           this.enemyStuckSince[i] = this.time.now;
-        } else if (this.time.now - this.enemyStuckSince[i] > 2000) {
+        } else if (this.time.now - this.enemyStuckSince[i] > 1000) {
           seekEdge = true;
         }
       } else {
         this.enemyStuckSince[i] = -1;
       }
 
+      let seekJump = false;
+      if (onGround && target.y < enemy.y - 40) {
+        if (this.enemyJumpStuckSince[i] < 0) {
+          this.enemyJumpStuckSince[i] = this.time.now;
+        } else if (this.time.now - this.enemyJumpStuckSince[i] > 2000) {
+          seekJump = true;
+        }
+      } else {
+        this.enemyJumpStuckSince[i] = -1;
+      }
+
       if (seekEdge) {
-        const edgeDir = this.findNearestEdgeDir(enemy);
-        enemy.setVelocityX(edgeDir * 300);
+        const edgeDir = this.findClosestPlatformEdgeDir(enemy);
+        if (onGround && !this.hasGroundAhead(enemy, edgeDir)) {
+          this.handleEdgeDrop(enemy, edgeDir);
+        } else {
+          enemy.setVelocityX(edgeDir * 300);
+        }
         this.enemyDirections[i] = edgeDir;
+      } else if (seekJump) {
+        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, target.x, target.y);
+        const moveDir = Math.cos(angle) > 0 ? 1 : -1;
+        enemy.setVelocityX(Math.cos(angle) * 300);
+        enemy.setVelocityY(-600);
+        this.enemyDirections[i] = moveDir;
       } else if (hasGun) {
         if (!this.enemyGun) continue;
         const gun = this.enemyGun;
@@ -632,12 +661,16 @@ export class GameScene extends Phaser.Scene {
               enemy.setVelocityX(Math.cos(angle) * 300);
               enemy.setVelocityY(-600);
             } else if (target.y > enemy.y + 30) {
-              enemy.setVelocityX(Math.cos(angle) * 300);
+              this.handleEdgeDrop(enemy, moveDirGun);
             } else {
+              enemy.setData('edgePauseAt', undefined);
+              
               enemy.setVelocityX(0);
             }
           } else {
-            enemy.setVelocityX(Math.cos(angle) * 300);
+            enemy.setData('edgePauseAt', undefined);
+            
+            enemy.setVelocityX(Math.cos(angle) * (target.y > enemy.y + 30 ? 500 : 300));
           }
           this.enemyDirections[0] = moveDirGun;
         }
@@ -649,12 +682,16 @@ export class GameScene extends Phaser.Scene {
             enemy.setVelocityX(Math.cos(angle) * 300);
             enemy.setVelocityY(-600);
           } else if (target.y > enemy.y + 30) {
-            enemy.setVelocityX(Math.cos(angle) * 300);
+            this.handleEdgeDrop(enemy, moveDirMelee);
           } else {
+            enemy.setData('edgePauseAt', undefined);
+            
             enemy.setVelocityX(0);
           }
         } else {
-          enemy.setVelocityX(Math.cos(angle) * 300);
+          enemy.setData('edgePauseAt', undefined);
+          
+          enemy.setVelocityX(Math.cos(angle) * (target.y > enemy.y + 30 ? 500 : 300));
         }
         this.enemyDirections[1] = moveDirMelee;
 
@@ -688,12 +725,27 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private findNearestEdgeDir(sprite: Phaser.Physics.Arcade.Sprite): number {
-    const groundLeft = this.hasGroundAhead(sprite, -1);
-    const groundRight = this.hasGroundAhead(sprite, 1);
+  private findClosestPlatformEdgeDir(sprite: Phaser.Physics.Arcade.Sprite): number {
+    if (!this.platforms) return 1;
+    const body = sprite.body as Phaser.Physics.Arcade.Body;
+    if (!body) return 1;
 
-    if (!groundLeft && groundRight) return -1;
-    if (groundLeft && !groundRight) return 1;
+    for (const child of this.platforms.getChildren()) {
+      const platBody = (child as Phaser.GameObjects.Rectangle).body as Phaser.Physics.Arcade.StaticBody;
+      if (!platBody) continue;
+      if (!(child as Phaser.GameObjects.Rectangle).visible) continue;
+      if (body.x + body.width > platBody.x && body.x < platBody.x + platBody.width) {
+        const platLeft = platBody.x;
+        const platRight = platBody.x + platBody.width;
+        const platCenterX = (platLeft + platRight) / 2;
+        const toLeft = Math.abs(sprite.x - platLeft);
+        const toRight = Math.abs(sprite.x - platRight);
+        if (Math.abs(platCenterX - 400) < 20 || Math.abs(toLeft - toRight) < 10) {
+          return Math.random() < 0.5 ? -1 : 1;
+        }
+        return sprite.x > 400 ? -1 : 1;
+      }
+    }
     return 1;
   }
 
@@ -816,6 +868,9 @@ export class GameScene extends Phaser.Scene {
         this.allyGun.destroy();
         this.allyGun = null;
       }
+      if (target === this.ally && this.allyFSMText) {
+        this.allyFSMText.setVisible(false);
+      }
       if (enemyIdx >= 0 && enemyIdx === this.enemyGunIndex && this.enemyGun) {
         this.enemyGun.destroy();
         this.enemyGun = null;
@@ -830,6 +885,15 @@ export class GameScene extends Phaser.Scene {
 
   private updateAllyFSM(): void {
     if (!this.ally || !this.ally.active) return;
+
+    const allyDropStartY = this.ally.getData('dropStartY');
+    if (allyDropStartY !== undefined) {
+        if (this.ally.y > (allyDropStartY as number) + 2) {
+        this.ally.setData('dropStartY', undefined);
+      } else {
+        return;
+      }
+    }
 
     let state: string;
     let color: string;
@@ -873,16 +937,35 @@ export class GameScene extends Phaser.Scene {
         if (this.ally.body?.blocked.down && target.y > this.ally.y + 30) {
           if (this.allyStuckSince < 0) {
             this.allyStuckSince = this.time.now;
-          } else if (this.time.now - this.allyStuckSince > 2000) {
+          } else if (this.time.now - this.allyStuckSince > 1000) {
             seekEdge = true;
           }
         } else {
           this.allyStuckSince = -1;
         }
 
+        let seekJump = false;
+        if (this.ally.body?.blocked.down && target.y < this.ally.y - 40) {
+          if (this.allyJumpStuckSince < 0) {
+            this.allyJumpStuckSince = this.time.now;
+          } else if (this.time.now - this.allyJumpStuckSince > 2000) {
+            seekJump = true;
+          }
+        } else {
+          this.allyJumpStuckSince = -1;
+        }
+
         if (seekEdge) {
-          const edgeDir = this.findNearestEdgeDir(this.ally);
-          this.ally.setVelocityX(edgeDir * 300);
+          const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
+          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
+            this.handleEdgeDrop(this.ally, edgeDir);
+          } else {
+            this.ally.setVelocityX(edgeDir * 300);
+          }
+        } else if (seekJump) {
+          const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
+          this.ally.setVelocityX(Math.cos(angle) * 300);
+          this.ally.setVelocityY(-600);
         } else if (this.allyHasGun && this.allyGun) {
           const gx = this.allyGun.x;
           const gy = this.allyGun.y;
@@ -901,12 +984,16 @@ export class GameScene extends Phaser.Scene {
                 this.ally.setVelocityX(Math.cos(moveAngle) * 300);
                 this.ally.setVelocityY(-600);
               } else if (target.y > this.ally.y + 30) {
-                this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+                this.handleEdgeDrop(this.ally, moveDirAlly);
               } else {
+                this.ally.setData('edgePauseAt', undefined);
+                
                 this.ally.setVelocityX(0);
               }
             } else {
-              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+              this.ally.setData('edgePauseAt', undefined);
+              
+              this.ally.setVelocityX(Math.cos(moveAngle) * (target.y > this.ally.y + 30 ? 500 : 300));
             }
           }
         } else {
@@ -926,12 +1013,16 @@ export class GameScene extends Phaser.Scene {
               this.ally.setVelocityX(Math.cos(angle) * 300);
               this.ally.setVelocityY(-600);
             } else if (target.y > this.ally.y + 30) {
-              this.ally.setVelocityX(Math.cos(angle) * 300);
+              this.handleEdgeDrop(this.ally, moveDirAlly);
             } else {
+              this.ally.setData('edgePauseAt', undefined);
+              
               this.ally.setVelocityX(0);
             }
           } else {
-            this.ally.setVelocityX(Math.cos(angle) * 300);
+            this.ally.setData('edgePauseAt', undefined);
+            
+            this.ally.setVelocityX(Math.cos(angle) * (target.y > this.ally.y + 30 ? 500 : 300));
           }
         }
         this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
@@ -947,16 +1038,35 @@ export class GameScene extends Phaser.Scene {
         if (this.ally.body?.blocked.down && this.player.y > this.ally.y + 30) {
           if (this.allyStuckSince < 0) {
             this.allyStuckSince = this.time.now;
-          } else if (this.time.now - this.allyStuckSince > 2000) {
+          } else if (this.time.now - this.allyStuckSince > 1000) {
             seekEdge = true;
           }
         } else {
           this.allyStuckSince = -1;
         }
 
+        let seekJump = false;
+        if (this.ally.body?.blocked.down && this.player.y < this.ally.y - 40) {
+          if (this.allyJumpStuckSince < 0) {
+            this.allyJumpStuckSince = this.time.now;
+          } else if (this.time.now - this.allyJumpStuckSince > 2000) {
+            seekJump = true;
+          }
+        } else {
+          this.allyJumpStuckSince = -1;
+        }
+
         if (seekEdge) {
-          const edgeDir = this.findNearestEdgeDir(this.ally);
-          this.ally.setVelocityX(edgeDir * 300);
+          const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
+          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
+            this.handleEdgeDrop(this.ally, edgeDir);
+          } else {
+            this.ally.setVelocityX(edgeDir * 300);
+          }
+        } else if (seekJump) {
+          const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
+          this.ally.setVelocityX(Math.cos(angle) * 300);
+          this.ally.setVelocityY(-600);
         } else if (this.allyHasGun && this.allyGun) {
         const gx = this.allyGun.x;
         const gy = this.allyGun.y;
@@ -975,12 +1085,16 @@ export class GameScene extends Phaser.Scene {
               this.ally.setVelocityX(Math.cos(moveAngle) * 300);
               this.ally.setVelocityY(-600);
             } else if (this.player.y > this.ally.y + 30) {
-              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+              this.handleEdgeDrop(this.ally, moveDirAlly);
             } else {
+              this.ally.setData('edgePauseAt', undefined);
+              
               this.ally.setVelocityX(0);
             }
           } else {
-            this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+            this.ally.setData('edgePauseAt', undefined);
+            
+            this.ally.setVelocityX(Math.cos(moveAngle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
           }
         }
       } else {
@@ -1000,12 +1114,16 @@ export class GameScene extends Phaser.Scene {
               this.ally.setVelocityX(Math.cos(angle) * 300);
               this.ally.setVelocityY(-600);
             } else if (this.player.y > this.ally.y + 30) {
-              this.ally.setVelocityX(Math.cos(angle) * 300);
+              this.handleEdgeDrop(this.ally, moveDirAlly);
             } else {
+              this.ally.setData('edgePauseAt', undefined);
+              
               this.ally.setVelocityX(0);
             }
           } else {
-            this.ally.setVelocityX(Math.cos(angle) * 300);
+            this.ally.setData('edgePauseAt', undefined);
+            
+            this.ally.setVelocityX(Math.cos(angle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
           }
         }
         this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
@@ -1058,6 +1176,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
     return false;
+  }
+
+  private handleEdgeDrop(sprite: Phaser.Physics.Arcade.Sprite, moveDir: number): void {
+    sprite.setData('dropStartY', sprite.y);
+    sprite.setVelocityX(moveDir * 300);
+    sprite.setVelocityY(-100);
   }
 
   private checkFallDeath(): void {
@@ -1187,40 +1311,40 @@ export class GameScene extends Phaser.Scene {
         { x: 400, y: 120, w: 180, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
       ],
       [
-        { x: 400, y: 490, w: 300, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 200, y: 370, w: 180, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 600, y: 370, w: 180, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 400, y: 250, w: 200, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 250, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 550, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 490, w: 300, h: 16, color: 0x8B5E3C, stroke: 0x6B4226 },
+        { x: 200, y: 370, w: 180, h: 16, color: 0xA0724B, stroke: 0x8B5E3C },
+        { x: 600, y: 370, w: 180, h: 16, color: 0xA0724B, stroke: 0x8B5E3C },
+        { x: 400, y: 250, w: 200, h: 16, color: 0xC4956A, stroke: 0xA0724B },
+        { x: 250, y: 140, w: 120, h: 16, color: 0xC4956A, stroke: 0xA0724B },
+        { x: 550, y: 140, w: 120, h: 16, color: 0xC4956A, stroke: 0xA0724B },
       ],
       [
-        { x: 150, y: 480, w: 150, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 400, y: 490, w: 160, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 650, y: 480, w: 150, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 120, y: 360, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 680, y: 360, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 400, y: 240, w: 240, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 400, y: 130, w: 160, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 150, y: 480, w: 150, h: 16, color: 0xCC6600, stroke: 0x994D00 },
+        { x: 400, y: 490, w: 160, h: 16, color: 0xCC6600, stroke: 0x994D00 },
+        { x: 650, y: 480, w: 150, h: 16, color: 0xCC6600, stroke: 0x994D00 },
+        { x: 120, y: 360, w: 200, h: 16, color: 0xFF8833, stroke: 0xCC6600 },
+        { x: 680, y: 360, w: 200, h: 16, color: 0xFF8833, stroke: 0xCC6600 },
+        { x: 400, y: 240, w: 240, h: 16, color: 0xFFAA55, stroke: 0xFF8833 },
+        { x: 400, y: 130, w: 160, h: 16, color: 0xFFAA55, stroke: 0xFF8833 },
       ],
       [
-        { x: 400, y: 480, w: 500, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 300, y: 370, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 500, y: 370, w: 160, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 120, y: 270, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 400, y: 250, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 680, y: 270, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 400, y: 140, w: 120, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 400, y: 480, w: 500, h: 16, color: 0x8B5E3C, stroke: 0x6B4226 },
+        { x: 300, y: 370, w: 160, h: 16, color: 0xA0724B, stroke: 0x8B5E3C },
+        { x: 500, y: 370, w: 160, h: 16, color: 0xA0724B, stroke: 0x8B5E3C },
+        { x: 120, y: 270, w: 140, h: 16, color: 0xC4956A, stroke: 0xA0724B },
+        { x: 400, y: 250, w: 140, h: 16, color: 0xC4956A, stroke: 0xA0724B },
+        { x: 680, y: 270, w: 140, h: 16, color: 0xC4956A, stroke: 0xA0724B },
+        { x: 400, y: 140, w: 120, h: 16, color: 0xC4956A, stroke: 0xA0724B },
       ],
       [
-        { x: 200, y: 480, w: 180, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 600, y: 480, w: 180, h: 16, color: 0x4a7023, stroke: 0x2d4a15 },
-        { x: 400, y: 380, w: 200, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 80, y: 310, w: 140, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 720, y: 310, w: 140, h: 16, color: 0x6b8e23, stroke: 0x4a7023 },
-        { x: 250, y: 210, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 550, y: 210, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
-        { x: 400, y: 110, w: 140, h: 16, color: 0x8fbc3b, stroke: 0x4a7023 },
+        { x: 200, y: 480, w: 180, h: 16, color: 0x8B0000, stroke: 0x660000 },
+        { x: 600, y: 480, w: 180, h: 16, color: 0x8B0000, stroke: 0x660000 },
+        { x: 400, y: 380, w: 200, h: 16, color: 0xCC0000, stroke: 0x8B0000 },
+        { x: 80, y: 310, w: 140, h: 16, color: 0xCC0000, stroke: 0x8B0000 },
+        { x: 720, y: 310, w: 140, h: 16, color: 0xCC0000, stroke: 0x8B0000 },
+        { x: 250, y: 210, w: 140, h: 16, color: 0xFF4444, stroke: 0xCC0000 },
+        { x: 550, y: 210, w: 140, h: 16, color: 0xFF4444, stroke: 0xCC0000 },
+        { x: 400, y: 110, w: 140, h: 16, color: 0xFF4444, stroke: 0xCC0000 },
       ],
     ];
 
@@ -1232,12 +1356,40 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private getRandomSpawnPosition(): { x: number; y: number } {
-    if (!this.platforms) return { x: 400, y: 232 };
-    const children = this.platforms.getChildren();
-    const visible = children.filter(c => (c as Phaser.GameObjects.Rectangle).visible);
-    if (visible.length === 0) return { x: 400, y: 232 };
-    const plat = Phaser.Utils.Array.GetRandom(visible) as Phaser.GameObjects.Rectangle;
-    return { x: plat.x, y: (plat.y as number) - 14 };
+  private getSpawnPosition(stageIndex: number, spawnIndex: number): { x: number; y: number } {
+    const spawns: { x: number; y: number }[][] = [
+      [
+        { x: 80, y: 226 },
+        { x: 120, y: 226 },
+        { x: 680, y: 226 },
+        { x: 720, y: 226 },
+      ],
+      [
+        { x: 380, y: 236 },
+        { x: 420, y: 236 },
+        { x: 250, y: 126 },
+        { x: 550, y: 126 },
+      ],
+      [
+        { x: 150, y: 436 },
+        { x: 400, y: 446 },
+        { x: 650, y: 436 },
+        { x: 400, y: 86 },
+      ],
+      [
+        { x: 300, y: 436 },
+        { x: 500, y: 436 },
+        { x: 120, y: 226 },
+        { x: 680, y: 226 },
+      ],
+      [
+        { x: 200, y: 436 },
+        { x: 600, y: 436 },
+        { x: 250, y: 166 },
+        { x: 550, y: 166 },
+      ],
+    ];
+    const stage = spawns[stageIndex] ?? spawns[0];
+    return stage[spawnIndex] ?? stage[0];
   }
 }
