@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 
 const DINO_KEYS = ['vita', 'mort', 'tard', 'doux'];
 
-const BG_W = 650;
+const BG_W = 660;
 const BG_H = 415;
 const BG_X = 400;
 const BG_Y = 325;
