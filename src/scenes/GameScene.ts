@@ -43,6 +43,9 @@ export class GameScene extends Phaser.Scene {
   private roundScored: boolean = false;
   private roundFrozen: boolean = true;
 
+  private enemyStuckSince: number[] = [-1, -1];
+  private allyStuckSince: number = -1;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -142,7 +145,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.player && this.platforms) {
-      this.physics.add.collider(this.player, this.platforms);
+      this.physics.add.collider(this.player, this.platforms, undefined, this.canCollideWithPlatform, this);
     }
 
     const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
@@ -208,7 +211,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (this.platforms) {
-        this.physics.add.collider(enemy, this.platforms);
+        this.physics.add.collider(enemy, this.platforms, undefined, this.canCollideWithPlatform, this);
       }
 
       this.enemies.push(enemy);
@@ -236,7 +239,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.ally && this.platforms) {
-      this.physics.add.collider(this.ally, this.platforms);
+      this.physics.add.collider(this.ally, this.platforms, undefined, this.canCollideWithPlatform, this);
     }
 
     const playerGetsGun = Math.random() < 0.5;
@@ -528,6 +531,8 @@ export class GameScene extends Phaser.Scene {
     this.lastAllyShootTime = 0;
     this.lastPlayerAttackTime = 0;
     this.isPlayerAttacking = false;
+    this.enemyStuckSince = [-1, -1];
+    this.allyStuckSince = -1;
     this.startCountdown();
   }
 
@@ -609,7 +614,22 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
 
-      if (hasGun) {
+      let seekEdge = false;
+      if (onGround && target.y > enemy.y + 30) {
+        if (this.enemyStuckSince[i] < 0) {
+          this.enemyStuckSince[i] = this.time.now;
+        } else if (this.time.now - this.enemyStuckSince[i] > 2000) {
+          seekEdge = true;
+        }
+      } else {
+        this.enemyStuckSince[i] = -1;
+      }
+
+      if (seekEdge) {
+        const edgeDir = this.findNearestEdgeDir(enemy);
+        enemy.setVelocityX(edgeDir * 300);
+        this.enemyDirections[i] = edgeDir;
+      } else if (hasGun) {
         if (!this.enemyGun) continue;
         const gun = this.enemyGun;
         const angle = Phaser.Math.Angle.Between(gun.x, gun.y, target.x, target.y);
@@ -626,6 +646,8 @@ export class GameScene extends Phaser.Scene {
             if (this.hasPlatformInJumpRange(enemy, moveDirGun)) {
               enemy.setVelocityX(Math.cos(angle) * 300);
               enemy.setVelocityY(-600);
+            } else if (target.y > enemy.y + 30) {
+              enemy.setVelocityX(Math.cos(angle) * 300);
             } else {
               enemy.setVelocityX(0);
             }
@@ -641,6 +663,8 @@ export class GameScene extends Phaser.Scene {
           if (this.hasPlatformInJumpRange(enemy, moveDirMelee)) {
             enemy.setVelocityX(Math.cos(angle) * 300);
             enemy.setVelocityY(-600);
+          } else if (target.y > enemy.y + 30) {
+            enemy.setVelocityX(Math.cos(angle) * 300);
           } else {
             enemy.setVelocityX(0);
           }
@@ -677,6 +701,15 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private findNearestEdgeDir(sprite: Phaser.Physics.Arcade.Sprite): number {
+    const groundLeft = this.hasGroundAhead(sprite, -1);
+    const groundRight = this.hasGroundAhead(sprite, 1);
+
+    if (!groundLeft && groundRight) return -1;
+    if (groundLeft && !groundRight) return 1;
+    return 1;
   }
 
   private hasLineOfSight(fromX: number, fromY: number, toX: number, toY: number): boolean {
@@ -850,31 +883,48 @@ export class GameScene extends Phaser.Scene {
       }
       if (!target) {
         this.ally.setVelocityX(0);
-      } else if (this.allyHasGun && this.allyGun) {
-        const gx = this.allyGun.x;
-        const gy = this.allyGun.y;
-        const angle = this.allyGun.rotation;
-        if (this.hasLineOfSight(gx, gy, target.x, target.y)) {
-          this.ally.setVelocityX(0);
-          if (this.time.now > this.lastAllyShootTime + 2000) {
-            this.fireBullet(gx, gy, angle, 'ally');
-            this.lastAllyShootTime = this.time.now;
+      } else {
+        let seekEdge = false;
+        if (this.ally.body?.blocked.down && target.y > this.ally.y + 30) {
+          if (this.allyStuckSince < 0) {
+            this.allyStuckSince = this.time.now;
+          } else if (this.time.now - this.allyStuckSince > 2000) {
+            seekEdge = true;
           }
         } else {
-          const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
-          const moveDirAlly = Math.cos(moveAngle) > 0 ? 1 : -1;
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
-            if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
-              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
-              this.ally.setVelocityY(-600);
-            } else {
-              this.ally.setVelocityX(0);
+          this.allyStuckSince = -1;
+        }
+
+        if (seekEdge) {
+          const edgeDir = this.findNearestEdgeDir(this.ally);
+          this.ally.setVelocityX(edgeDir * 300);
+        } else if (this.allyHasGun && this.allyGun) {
+          const gx = this.allyGun.x;
+          const gy = this.allyGun.y;
+          const angle = this.allyGun.rotation;
+          if (this.hasLineOfSight(gx, gy, target.x, target.y)) {
+            this.ally.setVelocityX(0);
+            if (this.time.now > this.lastAllyShootTime + 2000) {
+              this.fireBullet(gx, gy, angle, 'ally');
+              this.lastAllyShootTime = this.time.now;
             }
           } else {
-            this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+            const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
+            const moveDirAlly = Math.cos(moveAngle) > 0 ? 1 : -1;
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
+              if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
+                this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+                this.ally.setVelocityY(-600);
+              } else if (target.y > this.ally.y + 30) {
+                this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+              } else {
+                this.ally.setVelocityX(0);
+              }
+            } else {
+              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+            }
           }
-        }
-      } else {
+        } else {
         const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, target.x, target.y);
         if (dist < 40) {
           this.ally.setVelocityX(0);
@@ -890,6 +940,8 @@ export class GameScene extends Phaser.Scene {
             if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
               this.ally.setVelocityX(Math.cos(angle) * 300);
               this.ally.setVelocityY(-600);
+            } else if (target.y > this.ally.y + 30) {
+              this.ally.setVelocityX(Math.cos(angle) * 300);
             } else {
               this.ally.setVelocityX(0);
             }
@@ -899,12 +951,28 @@ export class GameScene extends Phaser.Scene {
         }
         this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
       }
+      }
     }
 
     if (state === 'Hostil') {
       if (!this.player?.active) {
         this.ally.setVelocityX(0);
-      } else if (this.allyHasGun && this.allyGun) {
+      } else {
+        let seekEdge = false;
+        if (this.ally.body?.blocked.down && this.player.y > this.ally.y + 30) {
+          if (this.allyStuckSince < 0) {
+            this.allyStuckSince = this.time.now;
+          } else if (this.time.now - this.allyStuckSince > 2000) {
+            seekEdge = true;
+          }
+        } else {
+          this.allyStuckSince = -1;
+        }
+
+        if (seekEdge) {
+          const edgeDir = this.findNearestEdgeDir(this.ally);
+          this.ally.setVelocityX(edgeDir * 300);
+        } else if (this.allyHasGun && this.allyGun) {
         const gx = this.allyGun.x;
         const gy = this.allyGun.y;
         const angle = this.allyGun.rotation;
@@ -921,6 +989,8 @@ export class GameScene extends Phaser.Scene {
             if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
               this.ally.setVelocityX(Math.cos(moveAngle) * 300);
               this.ally.setVelocityY(-600);
+            } else if (this.player.y > this.ally.y + 30) {
+              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
             } else {
               this.ally.setVelocityX(0);
             }
@@ -944,6 +1014,8 @@ export class GameScene extends Phaser.Scene {
             if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
               this.ally.setVelocityX(Math.cos(angle) * 300);
               this.ally.setVelocityY(-600);
+            } else if (this.player.y > this.ally.y + 30) {
+              this.ally.setVelocityX(Math.cos(angle) * 300);
             } else {
               this.ally.setVelocityX(0);
             }
@@ -952,6 +1024,7 @@ export class GameScene extends Phaser.Scene {
           }
         }
         this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
+      }
       }
     }
 
@@ -1076,5 +1149,17 @@ export class GameScene extends Phaser.Scene {
         bullet.destroy();
       }
     });
+  }
+
+  private canCollideWithPlatform(sprite: unknown, platform: unknown): boolean {
+    const sBody = (sprite as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.Body;
+    const pBody = (platform as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.StaticBody;
+    if (!sBody || !pBody) return false;
+
+    // walls (tall) remain fully solid
+    if (pBody.height > 20) return true;
+
+    // one-way: only collide if sprite is near platform top and moving downward/resting
+    return (sBody.y + sBody.height) <= (pBody.y + 16) && sBody.velocity.y >= -10;
   }
 }
