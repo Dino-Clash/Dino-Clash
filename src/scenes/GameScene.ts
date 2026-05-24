@@ -116,7 +116,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player, this.platforms, undefined, this.canCollideWithPlatform, this);
     }
 
-    if (!this.anims.exists('doux_idle')) {
+    if (!this.anims.exists('doux_hurt')) {
     const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
     for (const key of dinoKeys) {
       this.anims.create({
