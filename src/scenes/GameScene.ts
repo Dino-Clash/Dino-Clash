@@ -35,6 +35,14 @@ export class GameScene extends Phaser.Scene {
   private isPlayerAttacking: boolean = false;
   private lastPlayerAttackTime: number = 0;
 
+  private playerScore: number = 0;
+  private enemyScore: number = 0;
+  private enemyScoreColor: string = '#ff0000';
+  private playerScoreText: Phaser.GameObjects.Text | null = null;
+  private enemyScoreText: Phaser.GameObjects.Text | null = null;
+  private roundScored: boolean = false;
+  private roundFrozen: boolean = true;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -121,7 +129,7 @@ export class GameScene extends Phaser.Scene {
     platTop.setStrokeStyle(1, 0x4a7023);
     this.platforms.add(platTop);
 
-    this.player = this.physics.add.sprite(400, 100, 'dino_doux');
+    this.player = this.physics.add.sprite(130, 232, 'dino_doux');
     this.player.setScale(2);
     this.player.setData('hp', 3);
     this.player.setData('invulnUntil', 0);
@@ -180,8 +188,8 @@ export class GameScene extends Phaser.Scene {
     this.enemyGroup = this.add.group();
 
     const enemySpawns = [
-      { x: 80, y: 360 },
-      { x: 720, y: 360 },
+      { x: 630, y: 232 },
+      { x: 670, y: 232 },
     ];
 
     for (let i = 0; i < enemySpawns.length; i++) {
@@ -203,7 +211,6 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.collider(enemy, this.platforms);
       }
 
-      enemy.setVelocityX(this.enemyDirections[i] * 300);
       this.enemies.push(enemy);
       this.enemyGroup.add(enemy);
 
@@ -216,7 +223,7 @@ export class GameScene extends Phaser.Scene {
       'weapon_gun',
     ).setDisplaySize(36, 26).setDepth(0);
 
-    this.ally = this.physics.add.sprite(440, 100, 'dino_vita');
+    this.ally = this.physics.add.sprite(170, 232, 'dino_vita');
     this.ally.setScale(2);
     this.ally.setData('hp', 3);
     this.ally.setData('invulnUntil', 0);
@@ -252,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets!, this.player!, (bullet) => {
       const b = bullet as Phaser.GameObjects.Rectangle;
       if (b.getData('owner') !== 'enemy') return;
-      this.applyDamageTo(this.player!, this.player!.x - b.x > 0 ? 1 : -1);
+      this.applyDamageTo(this.player!, this.player!.x - b.x > 0 ? 1 : -1, 'enemy');
       b.destroy();
     });
 
@@ -260,7 +267,10 @@ export class GameScene extends Phaser.Scene {
       const b = bullet as Phaser.GameObjects.Rectangle;
       const owner = b.getData('owner') as string;
       if (owner !== 'enemy' && owner !== 'player') return;
-      this.applyDamageTo(this.ally!, this.ally!.x - b.x > 0 ? 1 : -1);
+      this.applyDamageTo(this.ally!, this.ally!.x - b.x > 0 ? 1 : -1, owner);
+      if (owner === 'player') {
+        this.loyalty = Math.max(this.loyalty - 10, -100);
+      }
       b.destroy();
     });
 
@@ -269,7 +279,7 @@ export class GameScene extends Phaser.Scene {
       const owner = b.getData('owner') as string;
       if (owner !== 'ally' && owner !== 'player') return;
       const sp = enemy as Phaser.Physics.Arcade.Sprite;
-      this.applyDamageTo(sp, sp.x - b.x > 0 ? 1 : -1);
+      this.applyDamageTo(sp, sp.x - b.x > 0 ? 1 : -1, owner);
       b.destroy();
     });
 
@@ -290,16 +300,45 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    this.allyFSMText = this.add.text(0, 0, 'Loyal', {
+    this.allyFSMText = this.add.text(0, 0, 'Aliado', {
       fontSize: '12px',
       color: '#00ff00',
       fontFamily: 'monospace',
     }).setOrigin(0.5, 1).setDepth(10);
 
+    const playerDinoKey = this.player?.getData('dinoKey') as string ?? 'doux';
+    const pColor = this.getDinoColor(playerDinoKey);
+    const enemyDinoKeys = ['mort', 'tard'];
+    const randomEnemyKey = enemyDinoKeys[Phaser.Math.Between(0, 1)];
+    this.enemyScoreColor = this.getDinoColor(randomEnemyKey);
+
+    this.playerScoreText = this.add.text(390, 15, '0', {
+      fontSize: '28px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      color: pColor,
+    }).setOrigin(1, 0).setDepth(100);
+
+    this.add.text(400, 15, ' - ', {
+      fontSize: '28px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    }).setOrigin(0.5, 0).setDepth(100);
+
+    this.enemyScoreText = this.add.text(410, 15, '0', {
+      fontSize: '28px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      color: this.enemyScoreColor,
+    }).setOrigin(0, 0).setDepth(100);
+
     this.player.play('doux_idle');
+    this.startCountdown();
   }
 
   update(_time: number, _delta: number): void {
+    if (this.roundFrozen) return;
     if (this.player && this.player.active) {
       const onGround = this.player.body?.blocked.down ?? false;
 
@@ -347,6 +386,149 @@ export class GameScene extends Phaser.Scene {
     this.updateEnemyCombat();
     this.cleanupBullets();
     this.checkFallDeath();
+  }
+
+  private getDinoColor(dinoKey: string): string {
+    switch (dinoKey) {
+      case 'doux': return '#0000ff';
+      case 'mort': return '#ff0000';
+      case 'tard': return '#ffff00';
+      case 'vita': return '#00ff00';
+      default: return '#ffffff';
+    }
+  }
+
+  private updateScoreText(): void {
+    if (this.playerScoreText) {
+      this.playerScoreText.setText(String(this.playerScore));
+    }
+    if (this.enemyScoreText) {
+      this.enemyScoreText.setText(String(this.enemyScore));
+    }
+  }
+
+  private checkTeamElimination(): void {
+    if (this.roundScored) return;
+    const playerTeamAlive = [this.player, this.ally].filter(s => s?.active).length;
+    const enemyTeamAlive = this.enemies.filter(e => e.active).length;
+
+    if (playerTeamAlive === 0 && enemyTeamAlive > 0) {
+      this.roundScored = true;
+      this.enemyScore++;
+      this.updateScoreText();
+      this.time.delayedCall(4000, () => this.resetRound());
+    } else if (enemyTeamAlive === 0 && playerTeamAlive > 0) {
+      this.roundScored = true;
+      this.playerScore++;
+      if (this.loyalty <= 20) {
+        this.loyalty = Math.min(this.loyalty + 15, 100);
+      }
+      this.updateScoreText();
+      this.time.delayedCall(4000, () => this.resetRound());
+    }
+  }
+
+  private startCountdown(): void {
+    this.roundFrozen = true;
+    this.player?.setVelocity(0, 0);
+    this.ally?.setVelocity(0, 0);
+    for (const enemy of this.enemies) {
+      enemy.setVelocity(0, 0);
+    }
+
+    const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5).setDepth(200).setScrollFactor(0);
+    const countText = this.add.text(400, 300, '', {
+      fontSize: '64px',
+      color: '#ffffff',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(201).setScrollFactor(0);
+
+    const numbers = ['3', '2', '1'];
+    let index = 0;
+    const tick = (): void => {
+      if (index < numbers.length) {
+        countText.setText(numbers[index]);
+        index++;
+        this.time.delayedCall(1000, tick);
+      } else {
+        overlay.destroy();
+        countText.destroy();
+        this.roundFrozen = false;
+      }
+    };
+    tick();
+  }
+
+  private respawnCharacter(sprite: Phaser.Physics.Arcade.Sprite, x: number, y: number, dinoKey: string): void {
+    sprite.setPosition(x, y);
+    sprite.setActive(true).setVisible(true);
+    sprite.setAlpha(1);
+    sprite.setData('hp', 3);
+    sprite.setData('invulnUntil', 0);
+    sprite.setData('dinoKey', dinoKey);
+
+    const body = sprite.body as Phaser.Physics.Arcade.Body;
+    if (body) {
+      body.setEnable(true);
+      body.setAllowGravity(true);
+      body.setVelocity(0, 0);
+    }
+    sprite.refreshBody();
+    if (body) {
+      body.setSize(14, 18);
+      body.setOffset(5, 3);
+    }
+
+    sprite.play(`${dinoKey}_idle`, true);
+    sprite.setFlipX(false);
+  }
+
+  private resetRound(): void {
+    if (this.playerGun) { this.playerGun.destroy(); this.playerGun = null; }
+    if (this.allyGun) { this.allyGun.destroy(); this.allyGun = null; }
+    if (this.enemyGun) { this.enemyGun.destroy(); this.enemyGun = null; }
+
+    this.bullets?.clear(true, true);
+
+    this.respawnCharacter(this.player!, 130, 232, 'doux');
+
+    this.respawnCharacter(this.ally!, 170, 232, 'vita');
+    if (this.allyFSMText) {
+      this.allyFSMText.setVisible(true);
+    }
+
+    this.enemyDirections = [Math.random() < 0.5 ? 1 : -1, Math.random() < 0.5 ? 1 : -1];
+    this.respawnCharacter(this.enemies[0], 630, 232, 'mort');
+    this.respawnCharacter(this.enemies[1], 670, 232, 'tard');
+
+    const playerGetsGun = Math.random() < 0.5;
+    this.playerHasGun = playerGetsGun;
+    this.allyHasGun = !playerGetsGun;
+    this.enemyGunIndex = Phaser.Math.Between(0, 1);
+
+    if (this.playerHasGun) {
+      this.playerGun = this.add.image(this.player!.x, this.player!.y, 'weapon_gun').setDisplaySize(36, 26).setDepth(5);
+    }
+    if (this.allyHasGun) {
+      this.allyGun = this.add.image(this.ally!.x, this.ally!.y, 'weapon_gun').setDisplaySize(36, 26).setDepth(5);
+    }
+    this.enemyGun = this.add.image(
+      this.enemies[this.enemyGunIndex].x,
+      this.enemies[this.enemyGunIndex].y,
+      'weapon_gun',
+    ).setDisplaySize(36, 26).setDepth(0);
+
+    this.roundScored = false;
+    this.playerInvulnerable = false;
+    this.allyInvulnerable = false;
+    this.enemyInvulnerable = [false, false];
+    this.lastPlayerShootTime = 0;
+    this.lastEnemyShootTimes = [0, 0];
+    this.lastAllyShootTime = 0;
+    this.lastPlayerAttackTime = 0;
+    this.isPlayerAttacking = false;
+    this.startCountdown();
   }
 
   private updateGuns(): void {
@@ -473,7 +655,7 @@ export class GameScene extends Phaser.Scene {
           if (this.time.now > this.lastEnemyShootTimes[1] + 1000) {
             this.lastEnemyShootTimes[1] = this.time.now;
             enemy.play(`${dinoKey}_kick`);
-            this.applyDamageTo(target, !enemy.flipX ? 1 : -1);
+            this.applyDamageTo(target, !enemy.flipX ? 1 : -1, 'enemy');
           }
         }
       }
@@ -548,7 +730,7 @@ export class GameScene extends Phaser.Scene {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
       if (dist < 40) {
         const inFront = facingRight ? enemy.x > this.player.x : enemy.x < this.player.x;
-        if (inFront) this.applyDamageTo(enemy, facingRight ? 1 : -1);
+        if (inFront) this.applyDamageTo(enemy, facingRight ? 1 : -1, 'player');
       }
     }
 
@@ -557,14 +739,15 @@ export class GameScene extends Phaser.Scene {
       if (dist < 40) {
         const inFront = facingRight ? this.ally.x > this.player.x : this.ally.x < this.player.x;
         if (inFront) {
-          this.applyDamageTo(this.ally, facingRight ? 1 : -1);
+          this.applyDamageTo(this.ally, facingRight ? 1 : -1, 'player');
           this.loyalty = Math.max(this.loyalty - 10, -100);
         }
       }
     }
   }
 
-  private applyDamageTo(target: Phaser.Physics.Arcade.Sprite, dir: number): void {
+  private applyDamageTo(target: Phaser.Physics.Arcade.Sprite, dir: number, source?: string): void {
+    if (!target.active) return;
     if (target === this.player && this.playerInvulnerable) return;
     if (target === this.ally && this.allyInvulnerable) return;
     const enemyIdx = this.enemies.indexOf(target as Phaser.Physics.Arcade.Sprite);
@@ -572,7 +755,7 @@ export class GameScene extends Phaser.Scene {
 
     const hp = target.getData('hp') as number;
     target.setData('hp', hp - 1);
-    target.setVelocityX(dir * 1000);
+    target.setVelocityX(dir * 400);
     target.setVelocityY(-600);
 
     const key = target.getData('dinoKey') as string;
@@ -620,9 +803,10 @@ export class GameScene extends Phaser.Scene {
         this.enemyGun = null;
       }
 
-      if (target === this.ally) {
+      if (target === this.ally && source === 'player') {
         this.loyalty = Math.max(this.loyalty - 25, -100);
       }
+      this.checkTeamElimination();
     }
   }
 
@@ -633,26 +817,26 @@ export class GameScene extends Phaser.Scene {
     let color: string;
 
     if (this.loyalty > 20) {
-      state = 'Loyal';
+      state = 'Aliado';
       color = '#00ff00';
     } else if (this.loyalty >= -20) {
-      state = 'Inactive';
+      state = '???';
       color = '#ffff00';
     } else {
-      state = 'Hostile';
+      state = 'Hostil';
       color = '#ff0000';
     }
 
-    if (state === 'Inactive') {
+    if (state === '???') {
       this.ally.setVelocityX(0);
     }
 
-    if (!this.player?.active && state === 'Hostile') {
-      state = 'Loyal';
+    if (!this.player?.active && state === 'Hostil') {
+      state = 'Aliado';
       color = '#00ff00';
     }
 
-    if (state === 'Loyal') {
+    if (state === 'Aliado') {
       let target: Phaser.Physics.Arcade.Sprite | null = null;
       let nearestDist = Infinity;
       for (const e of this.enemies) {
@@ -697,7 +881,7 @@ export class GameScene extends Phaser.Scene {
           if (this.time.now > this.lastAllyShootTime + 1000) {
             this.lastAllyShootTime = this.time.now;
             this.ally.play('vita_kick');
-            this.applyDamageTo(target, !this.ally.flipX ? 1 : -1);
+            this.applyDamageTo(target, !this.ally.flipX ? 1 : -1, 'ally');
           }
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
@@ -717,7 +901,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    if (state === 'Hostile') {
+    if (state === 'Hostil') {
       if (!this.player?.active) {
         this.ally.setVelocityX(0);
       } else if (this.allyHasGun && this.allyGun) {
@@ -751,7 +935,7 @@ export class GameScene extends Phaser.Scene {
           if (this.time.now > this.lastAllyShootTime + 1000) {
             this.lastAllyShootTime = this.time.now;
             this.ally.play('vita_kick');
-            this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1);
+            this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1, 'ally');
           }
         } else {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
@@ -853,6 +1037,7 @@ export class GameScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.active && enemy.y > killY) killSprite(enemy);
     }
+    this.checkTeamElimination();
   }
 
   private hasPlatformInJumpRange(fromSprite: Phaser.Physics.Arcade.Sprite, direction: number): boolean {
