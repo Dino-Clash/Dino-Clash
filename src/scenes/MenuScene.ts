@@ -1,23 +1,25 @@
 import Phaser from 'phaser';
 
-interface DinoInfo {
-  key: string;
-  name: string;
-  color: number;
-}
+const DINO_KEYS = ['vita', 'mort', 'tard', 'doux'];
 
-const DINOS: DinoInfo[] = [
-  { key: 'doux', name: 'DOUX', color: 0x0000ff },
-  { key: 'mort', name: 'MORT', color: 0xff0000 },
-  { key: 'tard', name: 'TARD', color: 0xffff00 },
-  { key: 'vita', name: 'VITA', color: 0x00ff00 },
+const BG_W = 660;
+const BG_H = 420;
+const BG_X = 400;
+const BG_Y = 325;
+const QW = BG_W / 2;
+const QH = BG_H / 2;
+
+const QUADRANT_CENTERS = [
+  { x: BG_X - QW / 2, y: BG_Y - QH / 2 },
+  { x: BG_X + QW / 2, y: BG_Y - QH / 2 },
+  { x: BG_X - QW / 2, y: BG_Y + QH / 2 },
+  { x: BG_X + QW / 2, y: BG_Y + QH / 2 },
 ];
 
 export class MenuScene extends Phaser.Scene {
   private selectedDino: string | null = null;
-  private startButton!: Phaser.GameObjects.Text;
-  private selectionBoxes: Phaser.GameObjects.Rectangle[] = [];
-  private dinoSprites: Phaser.GameObjects.Sprite[] = [];
+  private startButton!: Phaser.GameObjects.Image;
+  private selectionHighlights: Phaser.GameObjects.Rectangle[] = [];
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -28,68 +30,46 @@ export class MenuScene extends Phaser.Scene {
     this.load.spritesheet('dino_mort', 'public/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
     this.load.spritesheet('dino_tard', 'public/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
     this.load.spritesheet('dino_vita', 'public/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.image('bg_1', 'public/assets/backgrounds/background1.png');
-    this.load.image('bg_2', 'public/assets/backgrounds/background2.png');
-    this.load.image('bg_3', 'public/assets/backgrounds/background3.png');
-    this.load.image('bg_4', 'public/assets/backgrounds/background4.png');
-    this.load.image('bg_5', 'public/assets/backgrounds/background5.png');
-    this.load.image('weapon_gun', 'public/assets/weapon/gun.png');
+
+    this.load.image('menu_frame', 'public/assets/menu/frame.png');
+    this.load.image('menu_bg', 'public/assets/menu/background-menu.jpg');
+    this.load.image('menu_start', 'public/assets/menu/button.png');
   }
 
   create(): void {
-    this.add.image(400, 300, 'bg_1').setDisplaySize(800, 600);
-
-    this.add.text(400, 50, 'DINO CLASH', {
-      fontSize: '44px',
-      color: '#ffffff',
-      fontFamily: 'monospace',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 5,
-    }).setOrigin(0.5);
-
     this.createAnimations();
 
-    const positions = [
-      { x: 220, y: 210 },
-      { x: 580, y: 210 },
-      { x: 220, y: 380 },
-      { x: 580, y: 380 },
-    ];
+    this.add.image(400, 300, 'menu_frame').setDisplaySize(800, 600);
 
-    for (let i = 0; i < DINOS.length; i++) {
-      const dino = DINOS[i];
-      const pos = positions[i];
+    this.add.image(BG_X, BG_Y, 'menu_bg').setDisplaySize(BG_W, BG_H);
 
-      const bg = this.add.rectangle(pos.x, pos.y, 200, 150, 0x222222)
-        .setStrokeStyle(3, dino.color)
-        .setInteractive({ useHandCursor: true });
+    for (let i = 0; i < DINO_KEYS.length; i++) {
+      const key = DINO_KEYS[i];
+      const qc = QUADRANT_CENTERS[i];
 
-      const sprite = this.add.sprite(pos.x, pos.y - 8, `dino_${dino.key}`);
-      sprite.setScale(3);
-      sprite.play(`${dino.key}_idle`);
+      const sprite = this.add.sprite(qc.x, qc.y - 8, `dino_${key}`);
+      sprite.setScale(4);
+      sprite.play(`${key}_idle`);
 
-      this.add.text(pos.x, pos.y + 58, dino.name, {
+      this.add.text(qc.x, qc.y + 65, key.toUpperCase(), {
         fontSize: '16px',
         color: '#ffffff',
         fontFamily: 'monospace',
         fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
       }).setOrigin(0.5);
 
-      bg.on('pointerdown', () => this.selectDino(dino.key));
+      const hitZone = this.add.rectangle(qc.x, qc.y, QW, QH).setInteractive({ useHandCursor: true }).setAlpha(0.001);
 
-      this.selectionBoxes.push(bg);
-      this.dinoSprites.push(sprite);
+      const highlight = this.add.rectangle(qc.x, qc.y, QW, QH).setStrokeStyle(0, 0xffffff).setFillStyle(undefined).setDepth(10);
+
+      hitZone.on('pointerdown', () => this.selectDino(key, highlight));
+
+      this.selectionHighlights.push(highlight);
     }
 
-    this.startButton = this.add.text(400, 540, 'START', {
-      fontSize: '32px',
-      color: '#555555',
-      fontFamily: 'monospace',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    this.startButton = this.add.image(400, 580, 'menu_start').setDepth(20).setInteractive({ useHandCursor: true }).setAlpha(0.4);
 
     this.startButton.on('pointerdown', () => {
       if (!this.selectedDino) return;
@@ -98,19 +78,19 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createAnimations(): void {
-    for (const dino of DINOS) {
-      if (!this.anims.exists(`${dino.key}_idle`)) {
+    for (const key of DINO_KEYS) {
+      if (!this.anims.exists(`${key}_idle`)) {
         this.anims.create({
-          key: `${dino.key}_idle`,
-          frames: this.anims.generateFrameNumbers(`dino_${dino.key}`, { start: 0, end: 3 }),
+          key: `${key}_idle`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 0, end: 3 }),
           frameRate: 8,
           repeat: -1,
         });
       }
-      if (!this.anims.exists(`${dino.key}_run`)) {
+      if (!this.anims.exists(`${key}_run`)) {
         this.anims.create({
-          key: `${dino.key}_run`,
-          frames: this.anims.generateFrameNumbers(`dino_${dino.key}`, { start: 4, end: 9 }),
+          key: `${key}_run`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 9 }),
           frameRate: 10,
           repeat: -1,
         });
@@ -118,19 +98,32 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private selectDino(key: string): void {
+  private selectDino(key: string, highlight: Phaser.GameObjects.Rectangle): void {
     this.selectedDino = key;
 
-    for (let i = 0; i < DINOS.length; i++) {
-      this.selectionBoxes[i].setStrokeStyle(3, DINOS[i].color);
-      this.dinoSprites[i].play(`${DINOS[i].key}_idle`);
+    for (const h of this.selectionHighlights) {
+      h.setStrokeStyle(0, 0xffffff);
     }
 
-    const idx = DINOS.findIndex(d => d.key === key);
-    this.selectionBoxes[idx].setStrokeStyle(4, 0xffffff);
-    this.dinoSprites[idx].play(`${key}_run`);
+    highlight.setStrokeStyle(4, 0xffffff);
 
-    this.startButton.setColor('#ffffff');
+    for (const dk of DINO_KEYS) {
+      const sprite = this.children.list.find(
+        c => c instanceof Phaser.GameObjects.Sprite && c.texture.key === `dino_${dk}`,
+      ) as Phaser.GameObjects.Sprite | undefined;
+      if (sprite) {
+        sprite.play(`${dk}_idle`);
+      }
+    }
+
+    const selSprite = this.children.list.find(
+      c => c instanceof Phaser.GameObjects.Sprite && c.texture.key === `dino_${key}`,
+    ) as Phaser.GameObjects.Sprite | undefined;
+    if (selSprite) {
+      selSprite.play(`${key}_run`);
+    }
+
+    this.startButton.setAlpha(1);
   }
 
   private startGame(): void {
