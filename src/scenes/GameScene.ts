@@ -8,6 +8,7 @@ export class GameScene extends Phaser.Scene {
   private keyD: Phaser.Input.Keyboard.Key | null = null;
   private keySpace: Phaser.Input.Keyboard.Key | null = null;
   private keyF: Phaser.Input.Keyboard.Key | null = null;
+  private keyS: Phaser.Input.Keyboard.Key | null = null;
 
   private enemies: Phaser.Physics.Arcade.Sprite[] = [];
   private enemyDirections: number[] = [1, -1];
@@ -95,6 +96,7 @@ export class GameScene extends Phaser.Scene {
     this.keyD = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D) ?? null;
     this.keySpace = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) ?? null;
     this.keyF = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F) ?? null;
+    this.keyS = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S) ?? null;
 
     this.physics.world.setBounds(0, -500, 800, 2000);
 
@@ -327,6 +329,14 @@ export class GameScene extends Phaser.Scene {
 
       if (onGround && (this.keySpace?.isDown || this.cursors?.up.isDown)) {
         this.player.setVelocityY(-600);
+      }
+
+      if (onGround && (this.keyS?.isDown || this.cursors?.down.isDown)) {
+        this.player.setData('dropThrough', true);
+        this.player.setVelocityY(50);
+        this.time.delayedCall(400, () => {
+          if (this.player?.active) this.player.setData('dropThrough', false);
+        });
       }
 
       const pBusy = this.player.anims.isPlaying &&
@@ -631,13 +641,22 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (seekEdge) {
-        const edgeDir = this.findClosestPlatformEdgeDir(enemy);
-        if (onGround && !this.hasGroundAhead(enemy, edgeDir)) {
-          this.handleEdgeDrop(enemy, edgeDir);
+        if (onGround && target.y > enemy.y + 30) {
+          enemy.setData('dropThrough', true);
+          const dropDir = target.x > enemy.x ? 1 : -1;
+          enemy.setVelocityX(dropDir * 100);
+          this.time.delayedCall(400, () => {
+            if (enemy.active) enemy.setData('dropThrough', false);
+          });
         } else {
-          enemy.setVelocityX(edgeDir * 300);
+          const edgeDir = this.findClosestPlatformEdgeDir(enemy);
+          if (onGround && !this.hasGroundAhead(enemy, edgeDir)) {
+            this.handleEdgeDrop(enemy, edgeDir);
+          } else {
+            enemy.setVelocityX(edgeDir * 300);
+          }
+          this.enemyDirections[i] = edgeDir;
         }
-        this.enemyDirections[i] = edgeDir;
       } else if (seekJump) {
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, target.x, target.y);
         const moveDir = Math.cos(angle) > 0 ? 1 : -1;
@@ -702,7 +721,7 @@ export class GameScene extends Phaser.Scene {
           if (this.enemyMeleeContactSince[i] < 0) {
             this.enemyMeleeContactSince[i] = this.time.now;
           }
-          if (this.time.now > this.enemyMeleeContactSince[i] + 500) {
+          if (this.time.now > this.enemyMeleeContactSince[i] + 250) {
             this.enemyMeleeContactSince[i] = this.time.now;
             enemy.play(`${dinoKey}_kick`);
             this.applyDamageTo(target, !enemy.flipX ? 1 : -1, 'enemy');
@@ -962,11 +981,20 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (seekEdge) {
-          const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
-            this.handleEdgeDrop(this.ally, edgeDir);
+          if (this.ally.body?.blocked.down && target.y > this.ally.y + 30) {
+            this.ally.setData('dropThrough', true);
+            const dropDir = target.x > this.ally.x ? 1 : -1;
+            this.ally.setVelocityX(dropDir * 100);
+            this.time.delayedCall(400, () => {
+              if (this.ally?.active) this.ally.setData('dropThrough', false);
+            });
           } else {
-            this.ally.setVelocityX(edgeDir * 300);
+            const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
+              this.handleEdgeDrop(this.ally, edgeDir);
+            } else {
+              this.ally.setVelocityX(edgeDir * 300);
+            }
           }
         } else if (seekJump) {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
@@ -1063,11 +1091,20 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (seekEdge) {
-          const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
-            this.handleEdgeDrop(this.ally, edgeDir);
+          if (this.ally.body?.blocked.down && this.player.y > this.ally.y + 30) {
+            this.ally.setData('dropThrough', true);
+            const dropDir = this.player.x > this.ally.x ? 1 : -1;
+            this.ally.setVelocityX(dropDir * 100);
+            this.time.delayedCall(400, () => {
+              if (this.ally?.active) this.ally.setData('dropThrough', false);
+            });
           } else {
-            this.ally.setVelocityX(edgeDir * 300);
+            const edgeDir = this.findClosestPlatformEdgeDir(this.ally);
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, edgeDir)) {
+              this.handleEdgeDrop(this.ally, edgeDir);
+            } else {
+              this.ally.setVelocityX(edgeDir * 300);
+            }
           }
         } else if (seekJump) {
           const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
@@ -1267,11 +1304,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private canCollideWithPlatform(sprite: unknown, platform: unknown): boolean {
-    const sBody = (sprite as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.Body;
+    const sObj = sprite as Phaser.GameObjects.GameObject;
     const pBody = (platform as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.StaticBody;
-    if (!sBody || !pBody) return false;
+    if (!pBody) return false;
+    const sBody = (sprite as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.Body;
+    if (!sBody) return false;
 
     if (pBody.height > 20) return true;
+
+    if (sObj.getData?.('dropThrough')) return false;
 
     return (sBody.y + sBody.height) <= (pBody.y + 16) && sBody.velocity.y >= -10;
   }
