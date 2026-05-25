@@ -45,6 +45,7 @@ export class GameScene extends Phaser.Scene {
 
   private enemyStuckSince: number[] = [-1, -1];
   private enemyJumpStuckSince: number[] = [-1, -1];
+  private enemyMeleeContactSince: number[] = [-1, -1];
   private allyStuckSince: number = -1;
   private allyJumpStuckSince: number = -1;
   private playerDinoKey: string = 'doux';
@@ -120,45 +121,45 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (!this.anims.exists('doux_hurt')) {
-    const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
-    for (const key of dinoKeys) {
-      this.anims.create({
-        key: `${key}_idle`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 0, end: 3 }),
-        frameRate: 8,
-        repeat: -1,
-      });
-      this.anims.create({
-        key: `${key}_run`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 9 }),
-        frameRate: 10,
-        repeat: -1,
-      });
-      this.anims.create({
-        key: `${key}_attack`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 10, end: 12 }),
-        frameRate: 10,
-        repeat: 0,
-      });
-      this.anims.create({
-        key: `${key}_kick`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 10, end: 12 }),
-        frameRate: 10,
-        repeat: 0,
-      });
-      this.anims.create({
-        key: `${key}_hurt`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 13, end: 16 }),
-        frameRate: 8,
-        repeat: 0,
-      });
-      this.anims.create({
-        key: `${key}_jump`,
-        frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 5 }),
-        frameRate: 6,
-        repeat: -1,
-      });
-    }
+      const dinoKeys = ['doux', 'mort', 'vita', 'tard'];
+      for (const key of dinoKeys) {
+        this.anims.create({
+          key: `${key}_idle`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 0, end: 3 }),
+          frameRate: 8,
+          repeat: -1,
+        });
+        this.anims.create({
+          key: `${key}_run`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 9 }),
+          frameRate: 10,
+          repeat: -1,
+        });
+        this.anims.create({
+          key: `${key}_attack`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 10, end: 12 }),
+          frameRate: 10,
+          repeat: 0,
+        });
+        this.anims.create({
+          key: `${key}_kick`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 10, end: 12 }),
+          frameRate: 10,
+          repeat: 0,
+        });
+        this.anims.create({
+          key: `${key}_hurt`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 13, end: 16 }),
+          frameRate: 8,
+          repeat: 0,
+        });
+        this.anims.create({
+          key: `${key}_jump`,
+          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 5 }),
+          frameRate: 6,
+          repeat: -1,
+        });
+      }
     }
 
     this.enemyGroup = this.add.group();
@@ -664,12 +665,12 @@ export class GameScene extends Phaser.Scene {
               this.handleEdgeDrop(enemy, moveDirGun);
             } else {
               enemy.setData('edgePauseAt', undefined);
-              
+
               enemy.setVelocityX(0);
             }
           } else {
             enemy.setData('edgePauseAt', undefined);
-            
+
             enemy.setVelocityX(Math.cos(angle) * (target.y > enemy.y + 30 ? 500 : 300));
           }
           this.enemyDirections[0] = moveDirGun;
@@ -685,12 +686,12 @@ export class GameScene extends Phaser.Scene {
             this.handleEdgeDrop(enemy, moveDirMelee);
           } else {
             enemy.setData('edgePauseAt', undefined);
-            
+
             enemy.setVelocityX(0);
           }
         } else {
           enemy.setData('edgePauseAt', undefined);
-          
+
           enemy.setVelocityX(Math.cos(angle) * (target.y > enemy.y + 30 ? 500 : 300));
         }
         this.enemyDirections[1] = moveDirMelee;
@@ -698,11 +699,16 @@ export class GameScene extends Phaser.Scene {
         const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, target.x, target.y);
         if (dist < 40) {
           enemy.setVelocityX(0);
-          if (this.time.now > this.lastEnemyShootTimes[1] + 1000) {
-            this.lastEnemyShootTimes[1] = this.time.now;
+          if (this.enemyMeleeContactSince[i] < 0) {
+            this.enemyMeleeContactSince[i] = this.time.now;
+          }
+          if (this.time.now > this.enemyMeleeContactSince[i] + 500) {
+            this.enemyMeleeContactSince[i] = this.time.now;
             enemy.play(`${dinoKey}_kick`);
             this.applyDamageTo(target, !enemy.flipX ? 1 : -1, 'enemy');
           }
+        } else {
+          this.enemyMeleeContactSince[i] = -1;
         }
       }
 
@@ -888,7 +894,7 @@ export class GameScene extends Phaser.Scene {
 
     const allyDropStartY = this.ally.getData('dropStartY');
     if (allyDropStartY !== undefined) {
-        if (this.ally.y > (allyDropStartY as number) + 2) {
+      if (this.ally.y > (allyDropStartY as number) + 2) {
         this.ally.setData('dropStartY', undefined);
       } else {
         return;
@@ -987,46 +993,46 @@ export class GameScene extends Phaser.Scene {
                 this.handleEdgeDrop(this.ally, moveDirAlly);
               } else {
                 this.ally.setData('edgePauseAt', undefined);
-                
+
                 this.ally.setVelocityX(0);
               }
             } else {
               this.ally.setData('edgePauseAt', undefined);
-              
+
               this.ally.setVelocityX(Math.cos(moveAngle) * (target.y > this.ally.y + 30 ? 500 : 300));
             }
           }
         } else {
-        const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, target.x, target.y);
-        if (dist < 40) {
-          this.ally.setVelocityX(0);
-          if (this.time.now > this.lastAllyShootTime + 1000) {
-            this.lastAllyShootTime = this.time.now;
-            this.ally.play(`${this.allyDinoKey}_kick`);
-            this.applyDamageTo(target, !this.ally.flipX ? 1 : -1, 'ally');
-          }
-        } else {
-          const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
-          const moveDirAlly = Math.cos(angle) > 0 ? 1 : -1;
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
-            if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
-              this.ally.setVelocityX(Math.cos(angle) * 300);
-              this.ally.setVelocityY(-600);
-            } else if (target.y > this.ally.y + 30) {
-              this.handleEdgeDrop(this.ally, moveDirAlly);
-            } else {
-              this.ally.setData('edgePauseAt', undefined);
-              
-              this.ally.setVelocityX(0);
+          const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, target.x, target.y);
+          if (dist < 40) {
+            this.ally.setVelocityX(0);
+            if (this.time.now > this.lastAllyShootTime + 1000) {
+              this.lastAllyShootTime = this.time.now;
+              this.ally.play(`${this.allyDinoKey}_kick`);
+              this.applyDamageTo(target, !this.ally.flipX ? 1 : -1, 'ally');
             }
           } else {
-            this.ally.setData('edgePauseAt', undefined);
-            
-            this.ally.setVelocityX(Math.cos(angle) * (target.y > this.ally.y + 30 ? 500 : 300));
+            const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
+            const moveDirAlly = Math.cos(angle) > 0 ? 1 : -1;
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
+              if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
+                this.ally.setVelocityX(Math.cos(angle) * 300);
+                this.ally.setVelocityY(-600);
+              } else if (target.y > this.ally.y + 30) {
+                this.handleEdgeDrop(this.ally, moveDirAlly);
+              } else {
+                this.ally.setData('edgePauseAt', undefined);
+
+                this.ally.setVelocityX(0);
+              }
+            } else {
+              this.ally.setData('edgePauseAt', undefined);
+
+              this.ally.setVelocityX(Math.cos(angle) * (target.y > this.ally.y + 30 ? 500 : 300));
+            }
           }
+          this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
         }
-        this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
-      }
       }
     }
 
@@ -1068,66 +1074,66 @@ export class GameScene extends Phaser.Scene {
           this.ally.setVelocityX(Math.cos(angle) * 300);
           this.ally.setVelocityY(-600);
         } else if (this.allyHasGun && this.allyGun) {
-        const gx = this.allyGun.x;
-        const gy = this.allyGun.y;
-        const angle = this.allyGun.rotation;
-        if (this.hasLineOfSight(gx, gy, this.player.x, this.player.y)) {
-          this.ally.setVelocityX(0);
-          if (this.time.now > this.lastAllyShootTime + 2000) {
-            this.fireBullet(gx, gy, angle, 'ally');
-            this.lastAllyShootTime = this.time.now;
-          }
-        } else {
-          const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
-          const moveDirAlly = Math.cos(moveAngle) > 0 ? 1 : -1;
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
-            if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
-              this.ally.setVelocityX(Math.cos(moveAngle) * 300);
-              this.ally.setVelocityY(-600);
-            } else if (this.player.y > this.ally.y + 30) {
-              this.handleEdgeDrop(this.ally, moveDirAlly);
-            } else {
-              this.ally.setData('edgePauseAt', undefined);
-              
-              this.ally.setVelocityX(0);
+          const gx = this.allyGun.x;
+          const gy = this.allyGun.y;
+          const angle = this.allyGun.rotation;
+          if (this.hasLineOfSight(gx, gy, this.player.x, this.player.y)) {
+            this.ally.setVelocityX(0);
+            if (this.time.now > this.lastAllyShootTime + 2000) {
+              this.fireBullet(gx, gy, angle, 'ally');
+              this.lastAllyShootTime = this.time.now;
             }
           } else {
-            this.ally.setData('edgePauseAt', undefined);
-            
-            this.ally.setVelocityX(Math.cos(moveAngle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
-          }
-        }
-      } else {
-        const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
-        if (dist < 40) {
-          this.ally.setVelocityX(0);
-          if (this.time.now > this.lastAllyShootTime + 1000) {
-            this.lastAllyShootTime = this.time.now;
-            this.ally.play(`${this.allyDinoKey}_kick`);
-            this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1, 'ally');
-          }
-        } else {
-          const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
-          const moveDirAlly = Math.cos(angle) > 0 ? 1 : -1;
-          if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
-            if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
-              this.ally.setVelocityX(Math.cos(angle) * 300);
-              this.ally.setVelocityY(-600);
-            } else if (this.player.y > this.ally.y + 30) {
-              this.handleEdgeDrop(this.ally, moveDirAlly);
+            const moveAngle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
+            const moveDirAlly = Math.cos(moveAngle) > 0 ? 1 : -1;
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
+              if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
+                this.ally.setVelocityX(Math.cos(moveAngle) * 300);
+                this.ally.setVelocityY(-600);
+              } else if (this.player.y > this.ally.y + 30) {
+                this.handleEdgeDrop(this.ally, moveDirAlly);
+              } else {
+                this.ally.setData('edgePauseAt', undefined);
+
+                this.ally.setVelocityX(0);
+              }
             } else {
               this.ally.setData('edgePauseAt', undefined);
-              
-              this.ally.setVelocityX(0);
+
+              this.ally.setVelocityX(Math.cos(moveAngle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
+            }
+          }
+        } else {
+          const dist = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
+          if (dist < 40) {
+            this.ally.setVelocityX(0);
+            if (this.time.now > this.lastAllyShootTime + 1000) {
+              this.lastAllyShootTime = this.time.now;
+              this.ally.play(`${this.allyDinoKey}_kick`);
+              this.applyDamageTo(this.player, !this.ally.flipX ? 1 : -1, 'ally');
             }
           } else {
-            this.ally.setData('edgePauseAt', undefined);
-            
-            this.ally.setVelocityX(Math.cos(angle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
+            const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, this.player.x, this.player.y);
+            const moveDirAlly = Math.cos(angle) > 0 ? 1 : -1;
+            if (this.ally.body?.blocked.down && !this.hasGroundAhead(this.ally, moveDirAlly)) {
+              if (this.hasPlatformInJumpRange(this.ally, moveDirAlly)) {
+                this.ally.setVelocityX(Math.cos(angle) * 300);
+                this.ally.setVelocityY(-600);
+              } else if (this.player.y > this.ally.y + 30) {
+                this.handleEdgeDrop(this.ally, moveDirAlly);
+              } else {
+                this.ally.setData('edgePauseAt', undefined);
+
+                this.ally.setVelocityX(0);
+              }
+            } else {
+              this.ally.setData('edgePauseAt', undefined);
+
+              this.ally.setVelocityX(Math.cos(angle) * (this.player.y > this.ally.y + 30 ? 500 : 300));
+            }
           }
+          this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
         }
-        this.ally.setFlipX(this.ally.body?.velocity.x ? this.ally.body.velocity.x < 0 : this.ally.flipX);
-      }
       }
     }
 
