@@ -18,8 +18,11 @@ const QUADRANT_CENTERS = [
 
 export class MenuScene extends Phaser.Scene {
   private selectedDino: string | null = null;
+  private allyDino: string | null = null;
   private startButton!: Phaser.GameObjects.Image;
   private selectionHighlights: Phaser.GameObjects.Rectangle[] = [];
+  private gameMode: '1player' | '2players' = '1player';
+  private modeButtons: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -34,6 +37,8 @@ export class MenuScene extends Phaser.Scene {
     this.load.image('menu_frame', 'public/assets/menu/frame.png');
     this.load.image('menu_bg', 'public/assets/menu/background-menu.jpg');
     this.load.image('menu_start', 'public/assets/menu/button.png');
+    this.load.image('mode_1player', 'public/assets/menu/1player.png');
+    this.load.image('mode_2players', 'public/assets/menu/2players.png');
   }
 
   create(): void {
@@ -73,9 +78,19 @@ export class MenuScene extends Phaser.Scene {
     this.startButton = this.add.image(400, 580, 'menu_start').setDepth(20).setInteractive({ useHandCursor: true }).setAlpha(0.4);
 
     this.startButton.on('pointerdown', () => {
-      if (!this.selectedDino) return;
+      if (this.gameMode === '1player' && !this.selectedDino) return;
+      if (this.gameMode === '2players' && (!this.selectedDino || !this.allyDino)) return;
       this.startGame();
     });
+
+    const mode1 = this.add.image(200, 580, 'mode_1player').setDepth(20).setDisplaySize(94, 24).setInteractive({ useHandCursor: true });
+    const mode2 = this.add.image(600, 580, 'mode_2players').setDepth(20).setDisplaySize(94, 24).setInteractive({ useHandCursor: true });
+    this.modeButtons = [mode1, mode2];
+
+    this.updateModeVisuals();
+
+    mode1.on('pointerdown', () => this.setMode('1player'));
+    mode2.on('pointerdown', () => this.setMode('2players'));
   }
 
   private createBgMask(bg: Phaser.GameObjects.Image): void {
@@ -120,34 +135,87 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private selectDino(key: string, highlight: Phaser.GameObjects.Rectangle): void {
-    this.selectedDino = key;
+    if (this.gameMode === '1player') {
+      if (this.selectedDino === key) {
+        this.selectedDino = null;
+        this.resetSelectionVisuals();
+        this.startButton.setAlpha(0.4);
+      } else {
+        this.selectedDino = key;
+        this.resetSelectionVisuals();
+        highlight.setStrokeStyle(4, 0xffffff);
+        this.playDinoAnim(key, `${key}_run`);
+        this.startButton.setAlpha(1);
+      }
+    } else {
+      if (!this.selectedDino) {
+        this.selectedDino = key;
+        this.resetSelectionVisuals();
+        highlight.setStrokeStyle(4, 0xffffff);
+        this.playDinoAnim(key, `${key}_run`);
+        this.startButton.setAlpha(0.4);
+      } else if (key === this.selectedDino) {
+        this.selectedDino = null;
+        this.allyDino = null;
+        this.resetSelectionVisuals();
+        this.startButton.setAlpha(0.4);
+      } else if (key === this.allyDino) {
+        this.allyDino = null;
+        this.resetSelectionVisuals();
+        const pIdx = DINO_KEYS.indexOf(this.selectedDino);
+        if (pIdx >= 0) this.selectionHighlights[pIdx].setStrokeStyle(4, 0xffffff);
+        this.playDinoAnim(this.selectedDino, `${this.selectedDino}_run`);
+        this.startButton.setAlpha(0.4);
+      } else {
+        this.allyDino = key;
+        this.resetSelectionVisuals();
+        const idx = DINO_KEYS.indexOf(key);
+        if (idx >= 0) this.selectionHighlights[idx].setStrokeStyle(4, 0x00ffff);
+        const pIdx = DINO_KEYS.indexOf(this.selectedDino);
+        if (pIdx >= 0) this.selectionHighlights[pIdx].setStrokeStyle(4, 0xffffff);
+        this.playDinoAnim(key, `${key}_run`);
+        this.playDinoAnim(this.selectedDino, `${this.selectedDino}_run`);
+        this.startButton.setAlpha(1);
+      }
+    }
+  }
 
+  private resetSelectionVisuals(): void {
     for (const h of this.selectionHighlights) {
       h.setStrokeStyle(0, 0xffffff);
     }
-
-    highlight.setStrokeStyle(4, 0xffffff);
-
     for (const dk of DINO_KEYS) {
-      const sprite = this.children.list.find(
-        c => c instanceof Phaser.GameObjects.Sprite && c.texture.key === `dino_${dk}`,
-      ) as Phaser.GameObjects.Sprite | undefined;
-      if (sprite) {
-        sprite.play(`${dk}_idle`);
-      }
+      this.playDinoAnim(dk, `${dk}_idle`);
     }
+  }
 
-    const selSprite = this.children.list.find(
-      c => c instanceof Phaser.GameObjects.Sprite && c.texture.key === `dino_${key}`,
+  private playDinoAnim(dinoKey: string, animKey: string): void {
+    const sprite = this.children.list.find(
+      c => c instanceof Phaser.GameObjects.Sprite && c.texture.key === `dino_${dinoKey}`,
     ) as Phaser.GameObjects.Sprite | undefined;
-    if (selSprite) {
-      selSprite.play(`${key}_run`);
-    }
+    if (sprite) sprite.play(animKey);
+  }
 
-    this.startButton.setAlpha(1);
+  private updateModeVisuals(): void {
+    const [m1, m2] = this.modeButtons;
+    m1.setAlpha(this.gameMode === '1player' ? 1 : 0.4);
+    m2.setAlpha(this.gameMode === '2players' ? 1 : 0.4);
+  }
+
+  private setMode(mode: '1player' | '2players'): void {
+    this.gameMode = mode;
+    this.selectedDino = null;
+    this.allyDino = null;
+    this.resetSelectionVisuals();
+    this.startButton.setAlpha(0.4);
+    this.updateModeVisuals();
   }
 
   private startGame(): void {
-    this.scene.start('GameScene', { playerDino: this.selectedDino });
+    if (this.gameMode === '2players') {
+      this.scene.start('GameScene', { playerDino: this.selectedDino, allyDino: this.allyDino, gameMode: this.gameMode });
+    } else {
+      this.scene.start('GameScene', { playerDino: this.selectedDino, gameMode: this.gameMode });
+    }
   }
 }

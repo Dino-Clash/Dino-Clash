@@ -9,6 +9,7 @@ export class GameScene extends Phaser.Scene {
   private keySpace: Phaser.Input.Keyboard.Key | null = null;
   private keyF: Phaser.Input.Keyboard.Key | null = null;
   private keyS: Phaser.Input.Keyboard.Key | null = null;
+  private keyH: Phaser.Input.Keyboard.Key | null = null;
 
   private enemies: Phaser.Physics.Arcade.Sprite[] = [];
   private enemyDirections: number[] = [1, -1];
@@ -43,6 +44,8 @@ export class GameScene extends Phaser.Scene {
   private enemyScoreText: Phaser.GameObjects.Text | null = null;
   private roundScored: boolean = false;
   private roundFrozen: boolean = true;
+  private gameMode: '1player' | '2players' = '1player';
+  private playerLabel: Phaser.GameObjects.Text | null = null;
 
   private enemyStuckSince: number[] = [-1, -1];
   private enemyJumpStuckSince: number[] = [-1, -1];
@@ -97,11 +100,13 @@ export class GameScene extends Phaser.Scene {
     this.keySpace = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) ?? null;
     this.keyF = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F) ?? null;
     this.keyS = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S) ?? null;
+    this.keyH = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.H) ?? null;
 
     this.physics.world.setBounds(0, -500, 800, 2000);
 
-    const sceneData = this.scene.settings.data as { playerDino?: string } | undefined;
+    const sceneData = this.scene.settings.data as { playerDino?: string; allyDino?: string; gameMode?: '1player' | '2players' } | undefined;
     this.playerDinoKey = sceneData?.playerDino ?? 'doux';
+    this.gameMode = sceneData?.gameMode ?? '1player';
     this.currentStageIndex = 0;
     this.setupStage(0);
 
@@ -166,9 +171,16 @@ export class GameScene extends Phaser.Scene {
 
     this.enemyGroup = this.add.group();
 
-    const uniqueKeys = this.getRandomDinoKeys(this.playerDinoKey);
-    this.allyDinoKey = uniqueKeys[0];
-    this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
+    if (sceneData?.allyDino) {
+      this.allyDinoKey = sceneData.allyDino;
+      const pool = ['doux', 'mort', 'tard', 'vita'].filter(k => k !== this.playerDinoKey && k !== this.allyDinoKey);
+      Phaser.Utils.Array.Shuffle(pool);
+      this.enemyDinoKeys = pool;
+    } else {
+      const uniqueKeys = this.getRandomDinoKeys(this.playerDinoKey);
+      this.allyDinoKey = uniqueKeys[0];
+      this.enemyDinoKeys = [uniqueKeys[1], uniqueKeys[2]];
+    }
 
     const e0 = this.getSpawnPosition(0, 2);
     const e1 = this.getSpawnPosition(0, 3);
@@ -225,7 +237,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.ally, this.platforms, undefined, this.canCollideWithPlatform, this);
     }
 
-    const playerGetsGun = Math.random() < 0.5;
+    const playerGetsGun = this.gameMode === '2players' ? true : Math.random() < 0.5;
     this.playerHasGun = playerGetsGun;
     this.allyHasGun = !playerGetsGun;
 
@@ -244,8 +256,10 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.bullets!, this.player!, (bullet) => {
       const b = bullet as Phaser.GameObjects.Rectangle;
-      if (b.getData('owner') !== 'enemy') return;
-      this.applyDamageTo(this.player!, this.player!.x - b.x > 0 ? 1 : -1, 'enemy');
+      const owner = b.getData('owner') as string;
+      if (owner === 'ally' && this.loyalty >= -20) return;
+      if (owner !== 'enemy' && owner !== 'ally') return;
+      this.applyDamageTo(this.player!, this.player!.x - b.x > 0 ? 1 : -1, owner);
       b.destroy();
     });
 
@@ -270,6 +284,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.roundFrozen) return;
       if (!pointer.leftButtonDown()) return;
       if (this.playerHasGun && this.playerGun) {
         if (this.time.now > this.lastPlayerShootTime + 2000) {
@@ -286,11 +301,17 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    this.allyFSMText = this.add.text(0, 0, 'Aliado', {
+    this.allyFSMText = this.add.text(0, 0, this.gameMode === '2players' ? 'P2' : 'CPU', {
       fontSize: '12px',
-      color: '#00ff00',
+      color: this.gameMode === '2players' ? '#00ffff' : '#00ff00',
       fontFamily: 'monospace',
     }).setOrigin(0.5, 1).setDepth(10);
+
+    this.playerLabel = this.add.text(0, 0, 'P1', {
+      fontSize: '12px',
+      color: '#ffffff',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5, 1).setDepth(10).setVisible(this.gameMode === '2players');
 
     const playerDinoKey = this.player?.getData('dinoKey') as string ?? 'doux';
     const pColor = this.getDinoColor(playerDinoKey);
@@ -323,59 +344,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, _delta: number): void {
+    if (this.playerLabel && this.player?.active) {
+      this.playerLabel.setPosition(this.player.x, this.player.y - 30);
+    }
+    if (this.allyFSMText && this.ally?.active) {
+      this.allyFSMText.setPosition(this.ally.x, this.ally.y - 30);
+    }
+    this.updateGuns();
+
     if (this.roundFrozen) return;
-    if (this.player && this.player.active) {
-      const onGround = this.player.body?.blocked.down ?? false;
 
-      if (onGround && (this.keySpace?.isDown || this.cursors?.up.isDown)) {
-        this.player.setVelocityY(-600);
-      }
-
-      if (onGround && (this.keyS?.isDown || this.cursors?.down.isDown)) {
-        this.player.setData('dropThrough', true);
-        this.player.setVelocityY(50);
-        this.time.delayedCall(400, () => {
-          if (this.player?.active) this.player.setData('dropThrough', false);
-        });
-      }
-
-      const pBusy = this.player.anims.isPlaying &&
-        (this.player.anims.currentAnim?.key === `${this.playerDinoKey}_kick` ||
-          this.player.anims.currentAnim?.key === `${this.playerDinoKey}_hurt`);
-
-      if (this.keyA?.isDown) {
-        this.player.setVelocityX(-300);
-        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
-      } else if (this.keyD?.isDown) {
-        this.player.setVelocityX(300);
-        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
-      } else {
-        this.player.setVelocityX(0);
-        if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_idle`, true);
-      }
-
-      const pVx = this.player.body?.velocity.x ?? 0;
-      if (pVx < 0) this.player.setFlipX(true);
-      else if (pVx > 0) this.player.setFlipX(false);
-
-      if (!onGround && !pBusy) {
-        this.player.play(`${this.playerDinoKey}_jump`, true);
-      }
-
-      if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
-        this.isPlayerAttacking = true;
-        this.lastPlayerAttackTime = this.time.now;
-        this.player.play(`${this.playerDinoKey}_kick`);
-      }
-
-      if (this.isPlayerAttacking) {
-        this.checkMeleeHit();
-        this.isPlayerAttacking = false;
-      }
+    if (this.gameMode === '2players') {
+      this.handleP1Input();
+      this.handleP2Input();
+    } else {
+      this.handleP1Input();
     }
 
-    this.updateGuns();
-    this.updateAllyFSM();
+    if (this.gameMode !== '2players') {
+      this.updateAllyFSM();
+    }
     this.updateEnemyCombat();
     this.cleanupBullets();
     this.checkFallDeath();
@@ -424,9 +412,12 @@ export class GameScene extends Phaser.Scene {
   private startCountdown(): void {
     this.roundFrozen = true;
     this.player?.setVelocity(0, 0);
+    this.player?.setData('dropThrough', false);
     this.ally?.setVelocity(0, 0);
+    this.ally?.setData('dropThrough', false);
     for (const enemy of this.enemies) {
       enemy.setVelocity(0, 0);
+      enemy.setData('dropThrough', false);
     }
 
     const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5).setDepth(200).setScrollFactor(0);
@@ -461,6 +452,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setData('hp', 3);
     sprite.setData('invulnUntil', 0);
     sprite.setData('dinoKey', dinoKey);
+    sprite.setData('dropThrough', false);
     sprite.setData('dropStartY', undefined);
 
     const body = sprite.body as Phaser.Physics.Arcade.Body;
@@ -496,6 +488,16 @@ export class GameScene extends Phaser.Scene {
     this.respawnCharacter(this.ally!, p2.x, p2.y, this.allyDinoKey);
     if (this.allyFSMText) {
       this.allyFSMText.setVisible(true);
+      if (this.gameMode === '2players') {
+        this.allyFSMText.setText('P2');
+        this.allyFSMText.setColor('#00ffff');
+      } else {
+        this.allyFSMText.setText('CPU');
+        this.allyFSMText.setColor('#00ff00');
+      }
+    }
+    if (this.playerLabel) {
+      this.playerLabel.setVisible(this.gameMode === '2players');
     }
 
     this.enemyDirections = [Math.random() < 0.5 ? 1 : -1, Math.random() < 0.5 ? 1 : -1];
@@ -504,7 +506,7 @@ export class GameScene extends Phaser.Scene {
     const p4 = this.getSpawnPosition(this.currentStageIndex, 3);
     this.respawnCharacter(this.enemies[1], p4.x, p4.y, this.enemyDinoKeys[1]);
 
-    const playerGetsGun = Math.random() < 0.5;
+    const playerGetsGun = this.gameMode === '2players' ? true : Math.random() < 0.5;
     this.playerHasGun = playerGetsGun;
     this.allyHasGun = !playerGetsGun;
     this.enemyGunIndex = Phaser.Math.Between(0, 1);
@@ -893,6 +895,9 @@ export class GameScene extends Phaser.Scene {
         this.allyGun.destroy();
         this.allyGun = null;
       }
+      if (target === this.player && this.playerLabel) {
+        this.playerLabel.setVisible(false);
+      }
       if (target === this.ally && this.allyFSMText) {
         this.allyFSMText.setVisible(false);
       }
@@ -1188,8 +1193,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.allyFSMText) {
-      this.allyFSMText.setText(state);
-      this.allyFSMText.setColor(color);
+      if (this.gameMode === '2players') {
+        this.allyFSMText.setText('P2');
+        this.allyFSMText.setColor('#00ffff');
+      } else {
+        const label = state === 'Aliado' ? 'CPU' : state === 'Hostil' ? 'Angry' : state;
+        this.allyFSMText.setText(label);
+        this.allyFSMText.setColor(color);
+      }
       this.allyFSMText.setPosition(this.ally.x, this.ally.y - 30);
     }
   }
@@ -1237,9 +1248,14 @@ export class GameScene extends Phaser.Scene {
         body.setEnable(false);
         body.setVelocity(0, 0);
       }
-      if (sprite === this.player && this.playerGun) {
-        this.playerGun.destroy();
-        this.playerGun = null;
+      if (sprite === this.player) {
+        if (this.playerGun) {
+          this.playerGun.destroy();
+          this.playerGun = null;
+        }
+        if (this.playerLabel) {
+          this.playerLabel.setVisible(false);
+        }
       }
       if (sprite === this.ally) {
         if (this.allyGun) {
@@ -1263,6 +1279,119 @@ export class GameScene extends Phaser.Scene {
       if (enemy.active && enemy.y > killY) killSprite(enemy);
     }
     this.checkTeamElimination();
+  }
+
+  private handleP1Input(): void {
+    if (!this.player || !this.player.active) return;
+    const onGround = this.player.body?.blocked.down ?? false;
+
+    if (onGround && ((this.gameMode === '2players' ? this.cursors?.up.isDown : (this.keySpace?.isDown || this.cursors?.up.isDown)))) {
+      this.player.setVelocityY(-600);
+    }
+
+    if (onGround && ((this.gameMode === '2players' ? this.cursors?.down.isDown : (this.keyS?.isDown || this.cursors?.down.isDown)))) {
+      this.player.setData('dropThrough', true);
+      this.player.setVelocityY(50);
+      this.time.delayedCall(400, () => {
+        if (this.player?.active) this.player.setData('dropThrough', false);
+      });
+    }
+
+    const pBusy = this.player.anims.isPlaying &&
+      (this.player.anims.currentAnim?.key === `${this.playerDinoKey}_kick` ||
+        this.player.anims.currentAnim?.key === `${this.playerDinoKey}_hurt`);
+
+    const moveLeft = this.gameMode === '2players' ? this.cursors?.left.isDown : (this.keyA?.isDown || this.cursors?.left.isDown);
+    const moveRight = this.gameMode === '2players' ? this.cursors?.right.isDown : (this.keyD?.isDown || this.cursors?.right.isDown);
+
+    if (moveLeft) {
+      this.player.setVelocityX(-300);
+      if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
+    } else if (moveRight) {
+      this.player.setVelocityX(300);
+      if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_run`, true);
+    } else {
+      this.player.setVelocityX(0);
+      if (onGround && !pBusy) this.player.play(`${this.playerDinoKey}_idle`, true);
+    }
+
+    const pVx = this.player.body?.velocity.x ?? 0;
+    if (pVx < 0) this.player.setFlipX(true);
+    else if (pVx > 0) this.player.setFlipX(false);
+
+    if (!onGround && !pBusy) {
+      this.player.play(`${this.playerDinoKey}_jump`, true);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keyF!) && this.time.now > this.lastPlayerAttackTime + 1000) {
+      this.isPlayerAttacking = true;
+      this.lastPlayerAttackTime = this.time.now;
+      this.player.play(`${this.playerDinoKey}_kick`);
+    }
+
+    if (this.isPlayerAttacking) {
+      this.checkMeleeHit();
+      this.isPlayerAttacking = false;
+    }
+  }
+
+  private handleP2Input(): void {
+    if (!this.ally || !this.ally.active) return;
+    const onGround = this.ally.body?.blocked.down ?? false;
+
+    if (onGround && this.keySpace?.isDown) {
+      this.ally.setVelocityY(-600);
+    }
+
+    if (onGround && this.keyS?.isDown) {
+      this.ally.setData('dropThrough', true);
+      this.ally.setVelocityY(50);
+      this.time.delayedCall(400, () => {
+        if (this.ally?.active) this.ally.setData('dropThrough', false);
+      });
+    }
+
+    const aBusy = this.ally.anims.isPlaying &&
+      (this.ally.anims.currentAnim?.key === `${this.allyDinoKey}_kick` ||
+        this.ally.anims.currentAnim?.key === `${this.allyDinoKey}_hurt`);
+
+    if (this.keyA?.isDown) {
+      this.ally.setVelocityX(-300);
+      if (onGround && !aBusy) this.ally.play(`${this.allyDinoKey}_run`, true);
+    } else if (this.keyD?.isDown) {
+      this.ally.setVelocityX(300);
+      if (onGround && !aBusy) this.ally.play(`${this.allyDinoKey}_run`, true);
+    } else {
+      this.ally.setVelocityX(0);
+      if (onGround && !aBusy) this.ally.play(`${this.allyDinoKey}_idle`, true);
+    }
+
+    const aVx = this.ally.body?.velocity.x ?? 0;
+    if (aVx < 0) this.ally.setFlipX(true);
+    else if (aVx > 0) this.ally.setFlipX(false);
+
+    if (!onGround && !aBusy) {
+      this.ally.play(`${this.allyDinoKey}_jump`, true);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keyH!) && this.time.now > this.lastAllyShootTime + 1000) {
+      this.lastAllyShootTime = this.time.now;
+      this.ally.play(`${this.allyDinoKey}_kick`);
+      let target: Phaser.Physics.Arcade.Sprite | null = null;
+      let nearestDist = Infinity;
+      for (const candidate of [this.player, ...this.enemies]) {
+        if (candidate?.active) {
+          const d = Phaser.Math.Distance.Between(this.ally.x, this.ally.y, candidate.x, candidate.y);
+          if (d < nearestDist) {
+            nearestDist = d;
+            target = candidate;
+          }
+        }
+      }
+      if (target && nearestDist < 40) {
+        this.applyDamageTo(target, !this.ally.flipX ? 1 : -1, 'ally');
+      }
+    }
   }
 
   private hasPlatformInJumpRange(fromSprite: Phaser.Physics.Arcade.Sprite, direction: number): boolean {
@@ -1304,6 +1433,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private canCollideWithPlatform(sprite: unknown, platform: unknown): boolean {
+    if (this.roundFrozen) return true;
+
     const sObj = sprite as Phaser.GameObjects.GameObject;
     const pBody = (platform as Phaser.Types.Physics.Arcade.GameObjectWithBody).body as Phaser.Physics.Arcade.StaticBody;
     if (!pBody) return false;
