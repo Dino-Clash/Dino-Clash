@@ -558,8 +558,8 @@ export class GameScene extends Phaser.Scene {
 
     if (this.allyGun && this.ally?.active) {
       const target =
-        this.loyalty < -20 ? this.player :
-          this.enemies.find(e => e.active) ?? this.player;
+        this.loyalty < -20 && this.player?.active ? this.player :
+          this.enemies.find(e => e.active) ?? null;
       if (target?.active) {
         const angle = Phaser.Math.Angle.Between(this.ally.x, this.ally.y, target.x, target.y);
         this.allyGun.setPosition(
