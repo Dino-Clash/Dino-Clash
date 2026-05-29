@@ -24,6 +24,11 @@ export class MenuScene extends Phaser.Scene {
   private gameMode: '1player' | '2players' = '1player';
   private modeButtons: Phaser.GameObjects.Image[] = [];
 
+  private controlsPhase = false;
+  private controlsImage: Phaser.GameObjects.Image | null = null;
+  private hideableElements: Phaser.GameObjects.GameObject[] = [];
+  private interactiveElements: Phaser.GameObjects.GameObject[] = [];
+
   constructor() {
     super({ key: 'MenuScene' });
   }
@@ -39,6 +44,8 @@ export class MenuScene extends Phaser.Scene {
     this.load.image('menu_start', 'public/assets/menu/button.png');
     this.load.image('mode_1player', 'public/assets/menu/1player.png');
     this.load.image('mode_2players', 'public/assets/menu/2players.png');
+    this.load.image('menu_controls1', 'public/assets/menu/control1.png');
+    this.load.image('menu_controls2', 'public/assets/menu/control2.png');
   }
 
   create(): void {
@@ -48,6 +55,7 @@ export class MenuScene extends Phaser.Scene {
 
     const bg = this.add.image(BG_X, BG_Y, 'menu_bg').setDisplaySize(BG_W, BG_H);
     this.createBgMask(bg);
+    this.hideableElements.push(bg);
 
     for (let i = 0; i < DINO_KEYS.length; i++) {
       const key = DINO_KEYS[i];
@@ -56,8 +64,9 @@ export class MenuScene extends Phaser.Scene {
       const sprite = this.add.sprite(qc.x, qc.y - 8, `dino_${key}`);
       sprite.setScale(4);
       sprite.play(`${key}_idle`);
+      this.hideableElements.push(sprite);
 
-      this.add.text(qc.x, qc.y + 65, key.toUpperCase(), {
+      const label = this.add.text(qc.x, qc.y + 65, key.toUpperCase(), {
         fontSize: '16px',
         color: '#ffffff',
         fontFamily: 'monospace',
@@ -65,10 +74,14 @@ export class MenuScene extends Phaser.Scene {
         stroke: '#000000',
         strokeThickness: 3,
       }).setOrigin(0.5);
+      this.hideableElements.push(label);
 
       const hitZone = this.add.rectangle(qc.x, qc.y, QW, QH).setInteractive({ useHandCursor: true }).setAlpha(0.001);
+      this.hideableElements.push(hitZone);
+      this.interactiveElements.push(hitZone);
 
       const highlight = this.add.rectangle(qc.x, qc.y, QW, QH).setStrokeStyle(0, 0xffffff).setFillStyle(undefined).setDepth(10);
+      this.hideableElements.push(highlight);
 
       hitZone.on('pointerdown', () => this.selectDino(key, highlight));
 
@@ -78,14 +91,20 @@ export class MenuScene extends Phaser.Scene {
     this.startButton = this.add.image(400, 580, 'menu_start').setDepth(20).setInteractive({ useHandCursor: true }).setAlpha(0.4);
 
     this.startButton.on('pointerdown', () => {
+      if (this.controlsPhase) {
+        this.startGame();
+        return;
+      }
       if (this.gameMode === '1player' && !this.selectedDino) return;
       if (this.gameMode === '2players' && (!this.selectedDino || !this.allyDino)) return;
-      this.startGame();
+      this.showControls();
     });
 
     const mode1 = this.add.image(200, 580, 'mode_1player').setDepth(20).setDisplaySize(94, 24).setInteractive({ useHandCursor: true });
     const mode2 = this.add.image(600, 580, 'mode_2players').setDepth(20).setDisplaySize(94, 24).setInteractive({ useHandCursor: true });
     this.modeButtons = [mode1, mode2];
+    this.hideableElements.push(mode1, mode2);
+    this.interactiveElements.push(mode1, mode2);
 
     this.updateModeVisuals();
 
@@ -211,7 +230,24 @@ export class MenuScene extends Phaser.Scene {
     this.updateModeVisuals();
   }
 
+  private showControls(): void {
+    this.controlsPhase = true;
+    this.hideableElements.forEach(el => (el as any).setVisible(false));
+    this.interactiveElements.forEach(el => (el as any).disableInteractive());
+    const key = this.gameMode === '1player' ? 'menu_controls1' : 'menu_controls2';
+    this.controlsImage = this.add.image(400, 300, key).setDepth(15);
+    if (this.gameMode === '1player') {
+      this.controlsImage.setDisplaySize(651, 268);
+    } else {
+      this.controlsImage.setDisplaySize(690, 352);
+    }
+  }
+
   private startGame(): void {
+    if (this.controlsImage) {
+      this.controlsImage.destroy();
+      this.controlsImage = null;
+    }
     if (this.gameMode === '2players') {
       this.scene.start('GameScene', { playerDino: this.selectedDino, allyDino: this.allyDino, gameMode: this.gameMode });
     } else {
