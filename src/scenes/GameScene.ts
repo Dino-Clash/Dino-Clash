@@ -107,35 +107,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.spritesheet(
-      'dino_doux',
-      'public/assets/dinos/DinoSprites - doux.png',
-      { frameWidth: 24, frameHeight: 24 },
-    );
-    this.load.spritesheet(
-      'dino_mort',
-      'public/assets/dinos/DinoSprites - mort.png',
-      { frameWidth: 24, frameHeight: 24 },
-    );
-    this.load.spritesheet(
-      'dino_tard',
-      'public/assets/dinos/DinoSprites - tard.png',
-      { frameWidth: 24, frameHeight: 24 },
-    );
-    this.load.spritesheet(
-      'dino_vita',
-      'public/assets/dinos/DinoSprites - vita.png',
-      { frameWidth: 24, frameHeight: 24 },
-    );
-
+    this.load.spritesheet('dino_doux', 'public/assets/dinos/DinoSprites - doux.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_mort', 'public/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_tard', 'public/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_vita', 'public/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
     this.load.image('bg_1', 'public/assets/backgrounds/background1.png');
     this.load.image('bg_2', 'public/assets/backgrounds/background2.png');
     this.load.image('bg_3', 'public/assets/backgrounds/background3.png');
     this.load.image('bg_4', 'public/assets/backgrounds/background4.png');
     this.load.image('bg_5', 'public/assets/backgrounds/background5.png');
-
     this.load.image('weapon_gun', 'public/assets/weapon/gun.png');
-
     this.load.image('menu_pausa', 'public/assets/pause_menu/menu_pausa.png');
     this.load.image('btn_resume', 'public/assets/pause_menu/btn_resume.png');
     this.load.image('btn_menu', 'public/assets/pause_menu/btn_menu.png');
@@ -151,7 +132,35 @@ export class GameScene extends Phaser.Scene {
     this.keyH = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.H) ?? null;
     this.keyESC = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) ?? null;
 
+    this.events.on('shutdown', this.cleanup, this);
+
     this.isPaused = false;
+    this.physics.world.resume();
+    this.enemies = [];
+    this.enemyDirections = [1, -1];
+    this.lastEnemyShootTimes = [0, 0];
+    this.enemyInvulnerable = [false, false];
+    this.enemyStuckSince = [-1, -1];
+    this.enemyJumpStuckSince = [-1, -1];
+    this.enemyMeleeContactSince = [-1, -1];
+    this.allyStuckSince = -1;
+    this.allyJumpStuckSince = -1;
+    this.loyalty = 100;
+    this.playerScore = 0;
+    this.enemyScore = 0;
+    this.roundScored = false;
+    this.playerInvulnerable = false;
+    this.allyInvulnerable = false;
+    this.isPlayerAttacking = false;
+    this.lastPlayerShootTime = 0;
+    this.lastAllyShootTime = 0;
+    this.lastPlayerAttackTime = 0;
+    this.playerHasGun = false;
+    this.allyHasGun = false;
+    this.playerGun = null;
+    this.allyGun = null;
+    this.enemyGun = null;
+    this.enemyGunIndex = -1;
 
     this.physics.world.setBounds(0, -500, 800, 2000);
 
@@ -309,6 +318,45 @@ export class GameScene extends Phaser.Scene {
     this.startCountdown();
   }
 
+  private cleanup(): void {
+    this.player?.destroy();
+    this.ally?.destroy();
+    for (const enemy of this.enemies) {
+      enemy.destroy();
+    }
+    this.enemies = [];
+    this.enemyGroup?.destroy(true);
+    this.enemyGroup = null;
+    this.bullets?.destroy(true);
+    this.bullets = null;
+    this.platforms?.destroy();
+    this.platforms = null;
+    this.playerGun?.destroy();
+    this.playerGun = null;
+    this.allyGun?.destroy();
+    this.allyGun = null;
+    this.enemyGun?.destroy();
+    this.enemyGun = null;
+    this.bgImage?.destroy();
+    this.bgImage = null;
+    this.playerScoreText?.destroy();
+    this.playerScoreText = null;
+    this.enemyScoreText?.destroy();
+    this.enemyScoreText = null;
+    this.allyFSMText?.destroy();
+    this.allyFSMText = null;
+    this.playerLabel?.destroy();
+    this.playerLabel = null;
+    this.pauseOverlay?.destroy();
+    this.pauseOverlay = null;
+    this.pauseFrame?.destroy();
+    this.pauseFrame = null;
+    this.resumeButton?.destroy();
+    this.resumeButton = null;
+    this.menuButton?.destroy();
+    this.menuButton = null;
+  }
+
   update(_time: number, _delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.keyESC!)) {
       this.togglePause();
@@ -380,8 +428,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.menuButton.on('pointerdown', () => {
-      this.isPaused = false;
-      this.scene.start('MenuScene');
+      window.location.reload();
     });
   }
 
