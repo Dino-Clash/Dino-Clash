@@ -1,3 +1,4 @@
+import { inject } from '@vercel/analytics';
 import Phaser from 'phaser';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
@@ -23,4 +24,5 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [MenuScene, GameScene],
 };
 
+inject();
 new Phaser.Game(config);
