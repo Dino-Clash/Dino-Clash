@@ -23,6 +23,7 @@ export class CountdownUI {
   }
 
   private start(): void {
+    this.scene.sound.play('countdown_beep', { volume: 0.3 });
     const numbers = ['3', '2', '1'];
     let index = 0;
     const tick = (): void => {

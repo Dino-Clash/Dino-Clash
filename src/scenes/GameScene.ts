@@ -77,6 +77,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image('btn_resume', '/assets/pause_menu/btn_resume.png');
     this.load.image('btn_menu', '/assets/pause_menu/btn_menu.png');
     this.load.audio('button_click', '/audio/sound_effect/button_click.mp3');
+    this.load.audio('coin_pickup', '/audio/sound_effect/retro-game-coin-pickup-jam-fx-1-00-03.mp3');
+    this.load.audio('countdown_beep', '/audio/sound_effect/lesiakower-countdown-sound-effect-8-bit-151797.mp3');
+    this.load.audio('retro_hurt', '/audio/sound_effect/retro-hurt-1-236672.mp3');
+    this.load.audio('explosion', '/audio/sound_effect/8-bit-explosion-10-340462.mp3');
     this.load.audio('game_music_1', '/audio/game_music/8 Bit Roll - Fast Inspiring Chiptune By HeatleyBros [L-9VWu2ExYg].mp3');
     this.load.audio('game_music_2', '/audio/game_music/8 Bit Climb - Happy Upbeat Chiptune By HeatleyBros [X-vFlnbG9b0].mp3');
     this.load.audio('game_music_3', '/audio/game_music/8 Bit Walk - Happy Uplifting Chiptune By HeatleyBros [jdwtLTHULhQ].mp3');
@@ -607,6 +611,7 @@ export class GameScene extends Phaser.Scene {
   private applyDamageTo(target: DinoCharacter, dir: number, source?: string): void {
     if (!target.active || target.invulnerable) return;
     if (!target.applyDamage(dir)) return;
+    this.sound.play('retro_hurt', { volume: 0.5 });
     target.startInvulnerability();
 
     if (target.hp <= 0) {

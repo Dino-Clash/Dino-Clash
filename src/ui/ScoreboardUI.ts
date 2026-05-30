@@ -2,12 +2,14 @@ import Phaser from 'phaser';
 import { SCOREBOARD_Y, getDinoColor } from '../config/GameConstants';
 
 export class ScoreboardUI {
+  private scene: Phaser.Scene;
   private playerScoreText: Phaser.GameObjects.Text;
   private enemyScoreText: Phaser.GameObjects.Text;
   private playerScore: number = 0;
   private enemyScore: number = 0;
 
   constructor(scene: Phaser.Scene, playerDinoKey: string, enemyDinoKey: string) {
+    this.scene = scene;
     const pColor = getDinoColor(playerDinoKey);
     const eColor = getDinoColor(enemyDinoKey);
 
@@ -35,11 +37,13 @@ export class ScoreboardUI {
 
   incrementPlayer(): void {
     this.playerScore++;
+    this.scene.sound.play('coin_pickup', { volume: 0.3 });
     this.update();
   }
 
   incrementEnemy(): void {
     this.enemyScore++;
+    this.scene.sound.play('coin_pickup', { volume: 0.3 });
     this.update();
   }
 

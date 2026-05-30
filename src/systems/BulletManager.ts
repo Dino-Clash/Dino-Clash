@@ -19,6 +19,7 @@ export class BulletManager {
     body.setAllowGravity(false);
     body.setVelocity(Math.cos(angle) * BULLET_SPEED, Math.sin(angle) * BULLET_SPEED);
     bullet.setData('owner', owner);
+    this.scene.sound.play('explosion', { volume: 0.3 });
     this.bullets.add(bullet);
   }
 
