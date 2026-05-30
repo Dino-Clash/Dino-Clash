@@ -28,6 +28,7 @@ export class MenuScene extends Phaser.Scene {
   private controlsImage: Phaser.GameObjects.Image | null = null;
   private hideableElements: Phaser.GameObjects.GameObject[] = [];
   private interactiveElements: Phaser.GameObjects.GameObject[] = [];
+  private menuMusic: Phaser.Sound.BaseSound | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -46,10 +47,15 @@ export class MenuScene extends Phaser.Scene {
     this.load.image('mode_2players', 'public/assets/menu/2players.png');
     this.load.image('menu_controls1', 'public/assets/menu/control1.png');
     this.load.image('menu_controls2', 'public/assets/menu/control2.png');
+
+    this.load.audio('menu_music', 'public/audio/music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
   }
 
   create(): void {
     this.createAnimations();
+
+    this.menuMusic = this.sound.add('menu_music', { loop: true });
+    this.menuMusic.play();
 
     this.add.image(400, 300, 'menu_frame').setDisplaySize(800, 600);
 
@@ -244,6 +250,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startGame(): void {
+    if (this.menuMusic) {
+      this.menuMusic.stop();
+    }
     if (this.controlsImage) {
       this.controlsImage.destroy();
       this.controlsImage = null;
