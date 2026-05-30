@@ -239,7 +239,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.gameMode === '1player') {
       this.controlsImage.setDisplaySize(651, 268);
     } else {
-      this.controlsImage.setDisplaySize(690, 352);
+      this.controlsImage.setDisplaySize(670, 352);
     }
   }
 

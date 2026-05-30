@@ -47,6 +47,13 @@ export class GameScene extends Phaser.Scene {
   private keyF: Phaser.Input.Keyboard.Key | null = null;
   private keyS: Phaser.Input.Keyboard.Key | null = null;
   private keyH: Phaser.Input.Keyboard.Key | null = null;
+  private keyESC: Phaser.Input.Keyboard.Key | null = null;
+
+  private isPaused: boolean = false;
+  private pauseOverlay: Phaser.GameObjects.Rectangle | null = null;
+  private pauseFrame: Phaser.GameObjects.Image | null = null;
+  private resumeButton: Phaser.GameObjects.Image | null = null;
+  private menuButton: Phaser.GameObjects.Image | null = null;
 
   private enemies: Phaser.Physics.Arcade.Sprite[] = [];
   private enemyDirections: number[] = [1, -1];
@@ -128,6 +135,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_5', 'public/assets/backgrounds/background5.png');
 
     this.load.image('weapon_gun', 'public/assets/weapon/gun.png');
+
+    this.load.image('menu_pausa', 'public/assets/pause_menu/menu_pausa.png');
+    this.load.image('btn_resume', 'public/assets/pause_menu/btn_resume.png');
+    this.load.image('btn_menu', 'public/assets/pause_menu/btn_menu.png');
   }
 
   create(): void {
@@ -138,6 +149,9 @@ export class GameScene extends Phaser.Scene {
     this.keyF = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F) ?? null;
     this.keyS = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S) ?? null;
     this.keyH = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.H) ?? null;
+    this.keyESC = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) ?? null;
+
+    this.isPaused = false;
 
     this.physics.world.setBounds(0, -500, 800, 2000);
 
@@ -296,6 +310,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, _delta: number): void {
+    if (Phaser.Input.Keyboard.JustDown(this.keyESC!)) {
+      this.togglePause();
+    }
+
     if (this.playerLabel && this.player?.active) {
       this.playerLabel.setPosition(this.player.x, this.player.y - 30);
     }
@@ -304,7 +322,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateGuns();
 
-    if (this.roundFrozen) return;
+    if (this.roundFrozen || this.isPaused) return;
 
     if (this.gameMode === '2players') {
       this.handleP1Input();
@@ -319,6 +337,50 @@ export class GameScene extends Phaser.Scene {
     this.updateEnemyCombat();
     this.cleanupBullets();
     this.checkFallDeath();
+  }
+
+  private togglePause(): void {
+    if (this.pauseOverlay) { this.pauseOverlay.destroy(); this.pauseOverlay = null; }
+    if (this.pauseFrame) { this.pauseFrame.destroy(); this.pauseFrame = null; }
+    if (this.resumeButton) { this.resumeButton.destroy(); this.resumeButton = null; }
+    if (this.menuButton) { this.menuButton.destroy(); this.menuButton = null; }
+
+    if (!this.isPaused) {
+      this.isPaused = true;
+      this.createPauseMenu();
+    } else {
+      this.isPaused = false;
+    }
+  }
+
+  private createPauseMenu(): void {
+    this.pauseOverlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.6).setDepth(300).setScrollFactor(0);
+
+    this.pauseFrame = this.add.image(400, 300, 'menu_pausa').setScale(0.47).setDepth(301).setScrollFactor(0);
+
+    const btnScale = 0.3;
+    this.resumeButton = this.add.image(400, 290, 'btn_resume').setScale(btnScale).setDepth(302).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    this.menuButton = this.add.image(400, 365, 'btn_menu').setScale(btnScale).setDepth(302).setScrollFactor(0).setInteractive({ useHandCursor: true });
+
+    const addHover = (btn: Phaser.GameObjects.Image) => {
+      btn.on('pointerover', () => {
+        this.tweens.add({ targets: btn, scale: btnScale * 1.05, duration: 100, ease: 'Back.easeOut' });
+      });
+      btn.on('pointerout', () => {
+        this.tweens.add({ targets: btn, scale: btnScale, duration: 100, ease: 'Back.easeOut' });
+      });
+    };
+    addHover(this.resumeButton);
+    addHover(this.menuButton);
+
+    this.resumeButton.on('pointerdown', () => {
+      this.togglePause();
+    });
+
+    this.menuButton.on('pointerdown', () => {
+      this.isPaused = false;
+      this.scene.start('MenuScene');
+    });
   }
 
   private getDinoColor(dinoKey: string): string {
