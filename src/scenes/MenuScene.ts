@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-
-const DINO_KEYS = ['vita', 'mort', 'tard', 'doux'];
+import { DINO_KEYS, createDinoAnimations } from '../config/GameConstants';
+import type { DinoKey } from '../config/GameConstants';
 
 const BG_W = 660;
 const BG_H = 415;
@@ -53,9 +53,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.createAnimations();
+    createDinoAnimations(this.anims);
 
-    this.menuMusic = this.sound.add('menu_music', { loop: true, volume: 0.3 });
+    this.menuMusic = this.sound.add('menu_music', { loop: true, volume: 0.15 });
     this.menuMusic.play();
 
     this.add.image(400, 300, 'menu_frame').setDisplaySize(800, 600);
@@ -140,27 +140,6 @@ export class MenuScene extends Phaser.Scene {
     bg.setMask(g.createGeometryMask());
   }
 
-  private createAnimations(): void {
-    for (const key of DINO_KEYS) {
-      if (!this.anims.exists(`${key}_idle`)) {
-        this.anims.create({
-          key: `${key}_idle`,
-          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 0, end: 3 }),
-          frameRate: 8,
-          repeat: -1,
-        });
-      }
-      if (!this.anims.exists(`${key}_run`)) {
-        this.anims.create({
-          key: `${key}_run`,
-          frames: this.anims.generateFrameNumbers(`dino_${key}`, { start: 4, end: 9 }),
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
-    }
-  }
-
   private selectDino(key: string, highlight: Phaser.GameObjects.Rectangle): void {
     if (this.gameMode === '1player') {
       if (this.selectedDino === key) {
@@ -189,16 +168,16 @@ export class MenuScene extends Phaser.Scene {
       } else if (key === this.allyDino) {
         this.allyDino = null;
         this.resetSelectionVisuals();
-        const pIdx = DINO_KEYS.indexOf(this.selectedDino);
+        const pIdx = DINO_KEYS.indexOf(this.selectedDino as DinoKey);
         if (pIdx >= 0) this.selectionHighlights[pIdx].setStrokeStyle(4, 0xffffff);
         this.playDinoAnim(this.selectedDino, `${this.selectedDino}_run`);
         this.startButton.setAlpha(0.4);
       } else {
         this.allyDino = key;
         this.resetSelectionVisuals();
-        const idx = DINO_KEYS.indexOf(key);
+        const idx = DINO_KEYS.indexOf(key as DinoKey);
         if (idx >= 0) this.selectionHighlights[idx].setStrokeStyle(4, 0x00ffff);
-        const pIdx = DINO_KEYS.indexOf(this.selectedDino);
+        const pIdx = DINO_KEYS.indexOf(this.selectedDino as DinoKey);
         if (pIdx >= 0) this.selectionHighlights[pIdx].setStrokeStyle(4, 0xffffff);
         this.playDinoAnim(key, `${key}_run`);
         this.playDinoAnim(this.selectedDino, `${this.selectedDino}_run`);
