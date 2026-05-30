@@ -347,9 +347,11 @@ export class GameScene extends Phaser.Scene {
 
     if (!this.isPaused) {
       this.isPaused = true;
+      this.physics.world.pause();
       this.createPauseMenu();
     } else {
       this.isPaused = false;
+      this.physics.world.resume();
     }
   }
 
