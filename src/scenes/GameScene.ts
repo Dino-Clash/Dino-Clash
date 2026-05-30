@@ -120,6 +120,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('menu_pausa', 'public/assets/pause_menu/menu_pausa.png');
     this.load.image('btn_resume', 'public/assets/pause_menu/btn_resume.png');
     this.load.image('btn_menu', 'public/assets/pause_menu/btn_menu.png');
+    this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
   }
 
   create(): void {
@@ -423,12 +424,16 @@ export class GameScene extends Phaser.Scene {
     addHover(this.resumeButton);
     addHover(this.menuButton);
 
+    const playClick = () => this.sound.play('button_click', { volume: 0.5 });
+
     this.resumeButton.on('pointerdown', () => {
+      playClick();
       this.togglePause();
     });
 
     this.menuButton.on('pointerdown', () => {
-      window.location.reload();
+      playClick();
+      this.time.delayedCall(200, () => window.location.reload());
     });
   }
 
