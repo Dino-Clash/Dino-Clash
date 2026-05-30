@@ -35,21 +35,21 @@ export class MenuScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.spritesheet('dino_doux', 'public/assets/dinos/DinoSprites - doux.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_mort', 'public/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_tard', 'public/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_vita', 'public/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_doux', '/assets/dinos/DinoSprites - doux.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_mort', '/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_tard', '/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_vita', '/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
 
-    this.load.image('menu_frame', 'public/assets/menu/frame.png');
-    this.load.image('menu_bg', 'public/assets/menu/background-menu.jpg');
-    this.load.image('menu_start', 'public/assets/menu/button.png');
-    this.load.image('mode_1player', 'public/assets/menu/1player.png');
-    this.load.image('mode_2players', 'public/assets/menu/2players.png');
-    this.load.image('menu_controls1', 'public/assets/menu/control1.png');
-    this.load.image('menu_controls2', 'public/assets/menu/control2.png');
+    this.load.image('menu_frame', '/assets/menu/frame.png');
+    this.load.image('menu_bg', '/assets/menu/background-menu.jpg');
+    this.load.image('menu_start', '/assets/menu/button.png');
+    this.load.image('mode_1player', '/assets/menu/1player.png');
+    this.load.image('mode_2players', '/assets/menu/2players.png');
+    this.load.image('menu_controls1', '/assets/menu/control1.png');
+    this.load.image('menu_controls2', '/assets/menu/control2.png');
 
-    this.load.audio('menu_music', 'public/audio/menu_music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
-    this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
+    this.load.audio('menu_music', '/audio/menu_music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
+    this.load.audio('button_click', '/audio/sound_effect/button_click.mp3');
   }
 
   create(): void {

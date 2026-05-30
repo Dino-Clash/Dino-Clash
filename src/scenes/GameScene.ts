@@ -63,23 +63,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.spritesheet('dino_doux', 'public/assets/dinos/DinoSprites - doux.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_mort', 'public/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_tard', 'public/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.spritesheet('dino_vita', 'public/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
-    this.load.image('bg_1', 'public/assets/backgrounds/background1.png');
-    this.load.image('bg_2', 'public/assets/backgrounds/background2.png');
-    this.load.image('bg_3', 'public/assets/backgrounds/background3.png');
-    this.load.image('bg_4', 'public/assets/backgrounds/background4.png');
-    this.load.image('bg_5', 'public/assets/backgrounds/background5.png');
-    this.load.image('weapon_gun', 'public/assets/weapon/gun.png');
-    this.load.image('menu_pausa', 'public/assets/pause_menu/menu_pausa.png');
-    this.load.image('btn_resume', 'public/assets/pause_menu/btn_resume.png');
-    this.load.image('btn_menu', 'public/assets/pause_menu/btn_menu.png');
-    this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
-    this.load.audio('game_music_1', 'public/audio/game_music/8 Bit Roll - Fast Inspiring Chiptune By HeatleyBros [L-9VWu2ExYg].mp3');
-    this.load.audio('game_music_2', 'public/audio/game_music/8 Bit Climb - Happy Upbeat Chiptune By HeatleyBros [X-vFlnbG9b0].mp3');
-    this.load.audio('game_music_3', 'public/audio/game_music/8 Bit Walk - Happy Uplifting Chiptune By HeatleyBros [jdwtLTHULhQ].mp3');
+    this.load.spritesheet('dino_doux', '/assets/dinos/DinoSprites - doux.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_mort', '/assets/dinos/DinoSprites - mort.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_tard', '/assets/dinos/DinoSprites - tard.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.spritesheet('dino_vita', '/assets/dinos/DinoSprites - vita.png', { frameWidth: 24, frameHeight: 24 });
+    this.load.image('bg_1', '/assets/backgrounds/background1.png');
+    this.load.image('bg_2', '/assets/backgrounds/background2.png');
+    this.load.image('bg_3', '/assets/backgrounds/background3.png');
+    this.load.image('bg_4', '/assets/backgrounds/background4.png');
+    this.load.image('bg_5', '/assets/backgrounds/background5.png');
+    this.load.image('weapon_gun', '/assets/weapon/gun.png');
+    this.load.image('menu_pausa', '/assets/pause_menu/menu_pausa.png');
+    this.load.image('btn_resume', '/assets/pause_menu/btn_resume.png');
+    this.load.image('btn_menu', '/assets/pause_menu/btn_menu.png');
+    this.load.audio('button_click', '/audio/sound_effect/button_click.mp3');
+    this.load.audio('game_music_1', '/audio/game_music/8 Bit Roll - Fast Inspiring Chiptune By HeatleyBros [L-9VWu2ExYg].mp3');
+    this.load.audio('game_music_2', '/audio/game_music/8 Bit Climb - Happy Upbeat Chiptune By HeatleyBros [X-vFlnbG9b0].mp3');
+    this.load.audio('game_music_3', '/audio/game_music/8 Bit Walk - Happy Uplifting Chiptune By HeatleyBros [jdwtLTHULhQ].mp3');
   }
 
   create(): void {
