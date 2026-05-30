@@ -48,7 +48,7 @@ export class MenuScene extends Phaser.Scene {
     this.load.image('menu_controls1', 'public/assets/menu/control1.png');
     this.load.image('menu_controls2', 'public/assets/menu/control2.png');
 
-    this.load.audio('menu_music', 'public/audio/music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
+    this.load.audio('menu_music', 'public/audio/menu_music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
     this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
   }
 

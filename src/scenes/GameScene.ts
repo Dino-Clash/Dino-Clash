@@ -101,6 +101,9 @@ export class GameScene extends Phaser.Scene {
   private enemyDinoKeys: string[] = ['mort', 'tard'];
   private currentStageIndex: number = 0;
   private bgImage: Phaser.GameObjects.Image | null = null;
+  private gameMusic: Phaser.Sound.BaseSound | null = null;
+  private musicIndex: number = 0;
+  private musicKeys: string[] = ['game_music_1', 'game_music_2', 'game_music_3'];
 
   constructor() {
     super({ key: 'GameScene' });
@@ -121,6 +124,9 @@ export class GameScene extends Phaser.Scene {
     this.load.image('btn_resume', 'public/assets/pause_menu/btn_resume.png');
     this.load.image('btn_menu', 'public/assets/pause_menu/btn_menu.png');
     this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
+    this.load.audio('game_music_1', 'public/audio/game_music/8 Bit Roll - Fast Inspiring Chiptune By HeatleyBros [L-9VWu2ExYg].mp3');
+    this.load.audio('game_music_2', 'public/audio/game_music/8 Bit Climb - Happy Upbeat Chiptune By HeatleyBros [X-vFlnbG9b0].mp3');
+    this.load.audio('game_music_3', 'public/audio/game_music/8 Bit Walk - Happy Uplifting Chiptune By HeatleyBros [jdwtLTHULhQ].mp3');
   }
 
   create(): void {
@@ -317,6 +323,7 @@ export class GameScene extends Phaser.Scene {
 
     this.player!.play(`${this.playerDinoKey}_idle`);
     this.startCountdown();
+    this.startGameMusic();
   }
 
   private cleanup(): void {
@@ -356,6 +363,10 @@ export class GameScene extends Phaser.Scene {
     this.resumeButton = null;
     this.menuButton?.destroy();
     this.menuButton = null;
+    if (this.gameMusic) {
+      this.gameMusic.destroy();
+      this.gameMusic = null;
+    }
   }
 
   update(_time: number, _delta: number): void {
@@ -510,6 +521,25 @@ export class GameScene extends Phaser.Scene {
       }
     };
     tick();
+  }
+
+  private startGameMusic(): void {
+    this.musicIndex = 0;
+    this.playCurrentMusic();
+  }
+
+  private playCurrentMusic(): void {
+    if (this.gameMusic) {
+      this.gameMusic.destroy();
+      this.gameMusic = null;
+    }
+    const key = this.musicKeys[this.musicIndex];
+    this.gameMusic = this.sound.add(key, { loop: false, volume: 0.3 });
+    this.gameMusic.on('complete', () => {
+      this.musicIndex = (this.musicIndex + 1) % this.musicKeys.length;
+      this.playCurrentMusic();
+    });
+    this.gameMusic.play();
   }
 
   private respawnCharacter(sprite: Phaser.Physics.Arcade.Sprite, x: number, y: number, dinoKey: string): void {
