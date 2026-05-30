@@ -49,12 +49,13 @@ export class MenuScene extends Phaser.Scene {
     this.load.image('menu_controls2', 'public/assets/menu/control2.png');
 
     this.load.audio('menu_music', 'public/audio/music/Level Up Theme Song _8 Bit Summer__ by HeatleyBros [TiE9Vvmlxew].mp3');
+    this.load.audio('button_click', 'public/audio/sound_effect/button_click.mp3');
   }
 
   create(): void {
     this.createAnimations();
 
-    this.menuMusic = this.sound.add('menu_music', { loop: true });
+    this.menuMusic = this.sound.add('menu_music', { loop: true, volume: 0.3 });
     this.menuMusic.play();
 
     this.add.image(400, 300, 'menu_frame').setDisplaySize(800, 600);
@@ -89,6 +90,7 @@ export class MenuScene extends Phaser.Scene {
       const highlight = this.add.rectangle(qc.x, qc.y, QW, QH).setStrokeStyle(0, 0xffffff).setFillStyle(undefined).setDepth(10);
       this.hideableElements.push(highlight);
 
+      hitZone.on('pointerover', () => this.playClick());
       hitZone.on('pointerdown', () => this.selectDino(key, highlight));
 
       this.selectionHighlights.push(highlight);
@@ -96,6 +98,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.startButton = this.add.image(400, 580, 'menu_start').setDepth(20).setInteractive({ useHandCursor: true }).setAlpha(0.4);
 
+    this.startButton.on('pointerover', () => this.playClick());
     this.startButton.on('pointerdown', () => {
       if (this.controlsPhase) {
         this.startGame();
@@ -114,7 +117,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.updateModeVisuals();
 
+    mode1.on('pointerover', () => this.playClick());
     mode1.on('pointerdown', () => this.setMode('1player'));
+    mode2.on('pointerover', () => this.playClick());
     mode2.on('pointerdown', () => this.setMode('2players'));
   }
 
@@ -212,6 +217,10 @@ export class MenuScene extends Phaser.Scene {
     for (const dk of DINO_KEYS) {
       this.playDinoAnim(dk, `${dk}_idle`);
     }
+  }
+
+  private playClick(): void {
+    this.sound.play('button_click', { volume: 0.5 });
   }
 
   private playDinoAnim(dinoKey: string, animKey: string): void {
