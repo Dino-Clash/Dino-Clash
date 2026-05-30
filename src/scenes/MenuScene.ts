@@ -90,7 +90,6 @@ export class MenuScene extends Phaser.Scene {
       const highlight = this.add.rectangle(qc.x, qc.y, QW, QH).setStrokeStyle(0, 0xffffff).setFillStyle(undefined).setDepth(10);
       this.hideableElements.push(highlight);
 
-      hitZone.on('pointerover', () => this.playClick());
       hitZone.on('pointerdown', () => this.selectDino(key, highlight));
 
       this.selectionHighlights.push(highlight);
@@ -98,8 +97,8 @@ export class MenuScene extends Phaser.Scene {
 
     this.startButton = this.add.image(400, 580, 'menu_start').setDepth(20).setInteractive({ useHandCursor: true }).setAlpha(0.4);
 
-    this.startButton.on('pointerover', () => this.playClick());
     this.startButton.on('pointerdown', () => {
+      this.playClick();
       if (this.controlsPhase) {
         this.startGame();
         return;
@@ -117,10 +116,8 @@ export class MenuScene extends Phaser.Scene {
 
     this.updateModeVisuals();
 
-    mode1.on('pointerover', () => this.playClick());
-    mode1.on('pointerdown', () => this.setMode('1player'));
-    mode2.on('pointerover', () => this.playClick());
-    mode2.on('pointerdown', () => this.setMode('2players'));
+    mode1.on('pointerdown', () => { this.playClick(); this.setMode('1player'); });
+    mode2.on('pointerdown', () => { this.playClick(); this.setMode('2players'); });
   }
 
   private createBgMask(bg: Phaser.GameObjects.Image): void {
